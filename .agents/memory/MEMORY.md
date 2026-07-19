@@ -1,0 +1,11 @@
+- [Full security stack](security-stack.md) — 6-layer API + mobile integrity; velocity detect, HMAC request signing, emulator block; override code SMOVIE-SEC-OVERRIDE-2026
+- [API security layers](api-security-layers.md) — Firebase JWT auth + CORS whitelist + rate limiting + anti-bot + AES URL encryption; route structure and mobile integration
+- [TMDB consolidation](tmdb-consolidation.md) — all TMDB API calls must go through lib/tmdb.ts; never add a new TMDB_KEY constant or direct fetch in any other file
+- [Promotional poster filter](promotional-poster-filter.md) — fetchMoviePosters must use vote_average ≥ 4 as Tier 1; vote_count>0 as Tier 2; raw as Tier 3 — promo posters score 0–3
+- [MovieRow flash bug](movierow-flash-bug.md) — inline tmdbFetcher arrow functions cause re-fetch on every parent render; fixed with fetcher refs
+- [Hero poster enrichment](hero-poster-enrichment.md) — toMovieCard must forward tmdbId+mediaType or enrichment silently fails; fetchHero must call setHeroMovies only once (after enrichment)
+- [Hindi trailer system](hindi-trailer-system.md) — lib/hindi-trailer.ts is the single source of truth for trailer selection; use pickHindiFromVideos() for sync TMDB picks, fetchHindiTrailer() for async fetch+cache
+- [S-Movie content freshness system](smovie-content-freshness.md) — daily rotation helpers, popularity-weighted shuffle, and a Movie-type `popularity` field gotcha for generic sort/shuffle utils
+- [Firebase Google Sign-In branding](firebase-google-signin-branding.md) — consent screen domain comes from Firebase `authDomain`/auth handler hosting, not Google Cloud Console branding settings
+- [Nav crash root cause](nav-crash-root-cause.md) — movie/[id].tsx auth gate redirected unauthenticated users to onboarding; fix: remove redirect, only gate streaming action
+- [S-Movie pnpm install](smovie-deps-install.md) — 403 on websocket-driver from Replit firewall; fix: extract tarball to lib/websocket-driver and link via pnpm-workspace.yaml overrides

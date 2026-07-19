@@ -1,0 +1,107 @@
+{
+  "colorScheme": "dark",
+  "fonts": [
+    {
+      "family": "Source Sans Pro",
+      "role": "body"
+    }
+  ],
+  "colors": {
+    "primary": "#021E34",
+    "secondary": "#021321",
+    "accent": "#032541",
+    "background": "#032541",
+    "textPrimary": "#032541",
+    "link": "#032541"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Source Sans Pro",
+      "heading": "Source Sans Pro"
+    },
+    "fontStacks": {
+      "heading": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ],
+      "body": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "16px",
+      "h2": "48px",
+      "body": "19.2px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 10,
+    "borderRadius": "8px"
+  },
+  "components": {
+    "input": {
+      "background": "transparent",
+      "textColor": "#ACACAC",
+      "borderColor": null,
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg",
+    "favicon": "https://www.themoviedb.org/assets/2/apple-touch-icon-57ed4b3b0450fd5e9a0c20f34e814b82adaa1085c79bdde2f00ca8787b63d2c4.png",
+    "ogImage": null,
+    "logoHref": "File saved at: attached_assets/logoHref.html",
+    "logoAlt": "The Movie Database (TMDB)"
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": 0,
+    "reasoning": "Selected #0 because it is visible, located in the header, links to the homepage, and the alt text matches the brand name 'The Movie Database (TMDB)'.",
+    "confidence": 0.95,
+    "source": "llm"
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "film enthusiasts and industry professionals"
+  },
+  "designSystem": {
+    "framework": "custom",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0.9,
+    "overall": 0.45
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": 0,
+        "selectedLogoReasoning": "Selected #0 because it is visible, located in the header, links to the homepage, and the alt text matches the brand name 'The Movie Database (TMDB)'.",
+        "confidence": 0.95
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": false,
+      "llmSucceeded": false
+    }
+  }
+}

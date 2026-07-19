@@ -1,0 +1,94 @@
+{
+  "colorScheme": "dark",
+  "fonts": [
+    {
+      "family": "Source Sans Pro",
+      "role": "body"
+    },
+    {
+      "family": "Arial",
+      "role": "unknown"
+    }
+  ],
+  "colors": {
+    "primary": "#032541",
+    "accent": "#032541",
+    "background": "#000000",
+    "textPrimary": "#032541",
+    "link": "#032541"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Source Sans Pro",
+      "heading": "Source Sans Pro"
+    },
+    "fontStacks": {
+      "heading": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ],
+      "body": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Source Sans Pro",
+        "Arial",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "16px",
+      "h2": "24px",
+      "body": "16px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "20px"
+  },
+  "components": {},
+  "images": {
+    "favicon": null,
+    "ogImage": null
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": -1,
+    "reasoning": "No valid brand logo was found. The candidate is not in the header and lacks strong brand indicators such as href to home or alt text matching the brand.",
+    "confidence": 0.3,
+    "rejected": true,
+    "source": "llm"
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "low",
+    "targetAudience": "unknown"
+  },
+  "designSystem": {
+    "framework": "unknown",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0.9,
+    "overall": 0.45
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": -1,
+        "selectedLogoReasoning": "No valid brand logo was found. The candidate is not in the header and lacks strong brand indicators such as href to home or alt text matching the brand.",
+        "confidence": 0.3
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": false,
+      "llmSucceeded": false
+    }
+  }
+}
