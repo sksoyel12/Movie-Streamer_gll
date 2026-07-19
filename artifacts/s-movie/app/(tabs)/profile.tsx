@@ -517,6 +517,90 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
+          {/* ─── Unique User ID card (always visible when signed in) ─────── */}
+          {googleUser && identity && (
+            <View style={styles.uidSection}>
+              <LinearGradient
+                colors={["rgba(229,9,20,0.09)", "rgba(0,0,0,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.uidCard}
+              >
+                {/* Top: label + ID + copy button */}
+                <View style={styles.uidTopRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.uidLabel}>YOUR UNIQUE USER ID</Text>
+                    <Text style={styles.uidValue}>{identity.uniqueUserId}</Text>
+                  </View>
+                  <Pressable
+                    onPress={handleCopyUniqueId}
+                    hitSlop={12}
+                    style={({ pressed }) => [styles.uidCopyBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Ionicons name="copy-outline" size={19} color="#E50914" />
+                  </Pressable>
+                </View>
+
+                <View style={styles.uidInnerDivider} />
+
+                {/* Status: badge + optional Verify ID button */}
+                <View style={styles.uidStatusRow}>
+                  <Ionicons
+                    name={
+                      identity.verificationStatus === "verified"
+                        ? "shield-checkmark"
+                        : identity.isSuspended
+                        ? "alert-circle"
+                        : "shield-outline"
+                    }
+                    size={14}
+                    color={
+                      identity.verificationStatus === "verified"
+                        ? "#34D399"
+                        : identity.isSuspended
+                        ? "#EF4444"
+                        : "#737373"
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.uidStatusText,
+                      identity.verificationStatus === "verified" && { color: "#34D399" },
+                      identity.isSuspended && { color: "#EF4444" },
+                    ]}
+                  >
+                    {identity.isSuspended
+                      ? "Account Under Verification"
+                      : identity.verificationStatus === "verified"
+                      ? "Identity Verified"
+                      : identity.verificationStatus === "rejected"
+                      ? "Verification Failed — Re-upload ID"
+                      : identity.verificationStatus === "pending"
+                      ? "Verification Pending"
+                      : "Pending Verification"}
+                  </Text>
+                  {identity.verificationStatus !== "verified" && !identity.isSuspended && (
+                    <Pressable
+                      onPress={handleVerifyPhoto}
+                      disabled={verifyingPhoto}
+                      style={({ pressed }) => [
+                        styles.uidVerifyBtn,
+                        pressed && { opacity: 0.8 },
+                        verifyingPhoto && { opacity: 0.5 },
+                      ]}
+                    >
+                      {verifyingPhoto ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.uidVerifyBtnText}>Verify ID</Text>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+              </LinearGradient>
+            </View>
+          )}
+
           {/* ─── Settings sections ────────────────────────── */}
           <Section title={t.sectionAccount}>
             <SettingsRow
@@ -613,6 +697,13 @@ export default function ProfileScreen() {
               sub="Data usage policy"
               right={<Feather name="chevron-right" size={18} color="#404040" />}
               onPress={() => router.push("/privacy")}
+            />
+            <SettingsRow
+              icon={<Feather name="info" size={21} color="#fff" />}
+              label="About"
+              sub="App version, device info & ESN"
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => router.push("/about")}
             />
           </Section>
 
@@ -2279,6 +2370,74 @@ const styles = StyleSheet.create({
   progressBarTrack: { width: "100%", height: 5, backgroundColor: "#2a2a2a", borderRadius: 3, overflow: "hidden", marginTop: 8 },
   progressBarFill: { height: "100%", backgroundColor: "#0EA5E9", borderRadius: 3 },
   progressPct: { color: "#737373", fontSize: 13, fontFamily: "Inter_500Medium" },
+
+  // ── Unique User ID card (main profile view) ───────────────────────────────
+  uidSection: { paddingHorizontal: 16, paddingBottom: 8 },
+  uidCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(229,9,20,0.25)",
+    padding: 16,
+    gap: 12,
+    backgroundColor: "#0d0d0d",
+  },
+  uidTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  uidLabel: {
+    color: "#555",
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1.3,
+    marginBottom: 4,
+  },
+  uidValue: {
+    color: "#fff",
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 5,
+  },
+  uidCopyBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "rgba(229,9,20,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(229,9,20,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uidInnerDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  uidStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    flexWrap: "wrap",
+  },
+  uidStatusText: {
+    color: "#737373",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    flex: 1,
+  },
+  uidVerifyBtn: {
+    backgroundColor: "#E50914",
+    borderRadius: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexShrink: 0,
+  },
+  uidVerifyBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.3,
+  },
 });
 
 const authStyles = StyleSheet.create({
