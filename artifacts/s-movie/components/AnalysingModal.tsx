@@ -5,70 +5,35 @@ import {
   Dimensions,
   Easing,
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
-// ─── Source chain ─────────────────────────────────────────────────────────────
+// ─── Fake source chain — cycles at exactly 600ms each ─────────────────────────
+// These are all plausible-sounding piracy/aggregator domains.
+// NONE are real API calls — this is purely cosmetic UX.
 const SOURCE_CHAIN = [
-  { name: "fzmovies.cms",         slug: "fzmovies" },
-  { name: "vegamovies.global",    slug: "vegamovies" },
-  { name: "moviesmod.farm",       slug: "moviesmod" },
-  { name: "kisskh.com",           slug: "kisskh" },
-  { name: "mlwbd.st",             slug: "mlwbd" },
-  { name: "southfreak.wiki",      slug: "southfreak" },
-  { name: "mkvcinemas.cat",       slug: "mkvcinemas" },
-  { name: "animeworldindia.com",  slug: "animeworld" },
-  { name: "minoplres.xyz",        slug: "minoplres" },
-  { name: "netnaija.com",         slug: "netnaija" },
+  "123moviesfree.net",
+  "fzmovie.net",
+  "vegamovies.navy",
+  "1377x.to",
+  "netnaija.com",
+  "moviesmod.farm",
+  "fzmovies.ng",
+  "hdhub4u.cl",
+  "themoviebox.org",
+  "mlwbd.st",
+  "kisskh.com",
+  "flickystream.su",
+  "mkvcinemas.cat",
+  "moviesapi.club",
 ];
 
-const FILE_SIZES = [33.1, 45.4, 66.6, 76.4, 95.5, 108.2, 150.0, 175.5, 220.6];
-const UPLOADERS = [
-  "Hussain Omran",
-  "Tehua Juvenal",
-  "iam_ikeonyema",
-  "Mouâtamid Rafouri",
-  "Hota",
-  "BIPIN SUBEDI",
-  "CineStreamHD",
-  "AnimeDubber",
-  "StreamBot2K",
-];
+const CYCLE_MS = 600; // exactly 600ms per source per spec
 
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function buildSourceMeta(title: string, domain: string, slug: string) {
-  const size = FILE_SIZES[Math.floor(Math.random() * FILE_SIZES.length)];
-  const uploader = rand(UPLOADERS);
-
-  const year = 2023 + Math.floor(Math.random() * 3);
-  const month = String(1 + Math.floor(Math.random() * 12)).padStart(2, "0");
-  const day = String(1 + Math.floor(Math.random() * 28)).padStart(2, "0");
-  const date = `${year}-${month}-${day}`;
-
-  const titleSlug = title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "-");
-  const quality = rand(["1080P", "720P", "480P", "360P"]);
-
-  let url: string;
-  if (slug === "ailok") {
-    url = `https://ailok.pe/info/${title}/S1E1-${quality}`;
-  } else if (slug === "ugcvideo") {
-    url = `https://www.ugc-video.com/BT4-tv-${titleSlug}-episode-1-${quality}`;
-  } else if (slug === "vegamovies") {
-    const hash = Math.random().toString(36).slice(2, 10);
-    url = `https://vegamovies.pet/${hash}/season-1/episode-1-${quality}.mp4`;
-  } else if (slug === "fzmovies" || slug === "fzmovie") {
-    url = `https://www.${domain}/tv-${titleSlug}_1_1_${quality}-.html/season-1/epis...`;
-  } else {
-    url = `https://${domain}/${titleSlug}/s01e01-${quality}.mp4`;
-  }
-
-  return { size, uploader, date, url, domain };
 }
 
 interface Props {
@@ -77,94 +42,89 @@ interface Props {
   onComplete: () => void;
 }
 
-type Phase = "scanning" | "found";
-
 const { height: SCREEN_H } = Dimensions.get("window");
 
 export default function AnalysingModal({ visible, title, onComplete }: Props) {
-  const [phase, setPhase] = useState<Phase>("scanning");
   const [currentDomain, setCurrentDomain] = useState("");
-  const [subtitlesDone, setSubtitlesDone] = useState(false);
-  const [sourceMeta, setSourceMeta] = useState<ReturnType<typeof buildSourceMeta> | null>(null);
+  const [showSubtitleFlash, setShowSubtitleFlash] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(SCREEN_H)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const dotAnim = useRef(new Animated.Value(0)).current;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const clearAll = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
+  const clearAll = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
 
   const push = (fn: () => void, ms: number) => {
     const t = setTimeout(fn, ms);
     timersRef.current.push(t);
   };
 
-  // Slide in/out
+  // Slide in / out
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 200 }).start();
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 22,
+        stiffness: 200,
+      }).start();
     } else {
-      Animated.timing(slideAnim, { toValue: SCREEN_H, duration: 250, useNativeDriver: true }).start();
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_H,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible]);
-
-  // Animated dots
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(dotAnim, { toValue: 1, duration: 600, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-        Animated.timing(dotAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
 
   useEffect(() => {
     if (!visible) {
       clearAll();
-      setPhase("scanning");
       setCurrentDomain("");
-      setSubtitlesDone(false);
-      setSourceMeta(null);
-      fadeAnim.setValue(0);
+      setShowSubtitleFlash(false);
       return;
     }
 
-    // Randomly pick how many domains to "fail" before success (1–4)
-    const failCount = 1 + Math.floor(Math.random() * 4);
-    const successIdx = Math.min(failCount, SOURCE_CHAIN.length - 1);
-    const chain = SOURCE_CHAIN.slice(0, successIdx + 1);
+    // Pick a random subset of 4–7 sources to cycle through
+    const count = 4 + Math.floor(Math.random() * 4);
+    const shuffled = [...SOURCE_CHAIN].sort(() => Math.random() - 0.5);
+    const chain = shuffled.slice(0, count);
 
-    let cursor = 300;
+    let idx = 0;
+    setCurrentDomain(chain[0]);
 
-    chain.forEach(({ name }, idx) => {
-      const isLast = idx === chain.length - 1;
-      push(() => setCurrentDomain(name), cursor);
-      cursor += isLast ? 800 : 450 + Math.random() * 250;
+    // Cycle each source at exactly 600ms
+    intervalRef.current = setInterval(() => {
+      idx++;
+      if (idx < chain.length) {
+        setCurrentDomain(chain[idx]);
+      } else {
+        // Done cycling — stop interval
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
 
-      if (isLast) {
-        // Subtitles flash
-        push(() => setSubtitlesDone(true), cursor - 200);
-
-        // Switch to found phase
+        // Show "Subtitles downloaded successfully" for exactly 1 second
+        setShowSubtitleFlash(true);
         push(() => {
-          const winner = chain[chain.length - 1];
-          const meta = buildSourceMeta(title ?? "Unknown", winner.name, winner.slug);
-          setSourceMeta(meta);
-          setPhase("found");
-          Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-        }, cursor);
-
-        // Auto-dismiss after 2s
-        push(() => { clearAll(); onComplete(); }, cursor + 2000);
+          setShowSubtitleFlash(false);
+          clearAll();
+          onComplete();
+        }, 1000);
       }
-    });
+    }, CYCLE_MS);
 
     return clearAll;
   }, [visible]);
 
-  const displayTitle = title && title.length > 36 ? title.slice(0, 33) + "…" : (title ?? "Unknown");
+  const displayTitle =
+    title && title.length > 36 ? title.slice(0, 33) + "…" : (title ?? "Unknown");
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
@@ -176,142 +136,82 @@ export default function AnalysingModal({ visible, title, onComplete }: Props) {
         {/* Handle */}
         <View style={styles.handle} />
 
-        {phase === "scanning" ? (
-          /* ── Scanning phase ─────────────────────────────────────────── */
-          <View style={styles.scanBody}>
-            {/* Spinner + analysing text */}
-            <View style={styles.scanRow}>
-              <ActivityIndicator size="small" color="#4FC3F7" />
-              <View style={styles.scanTextWrap}>
+        <View style={styles.body}>
+          {/* Title */}
+          <Text style={styles.movieTitle} numberOfLines={1}>
+            {displayTitle}
+          </Text>
+
+          {/* Main scanning row */}
+          <View style={styles.scanRow}>
+            <ActivityIndicator size="small" color="#E50914" />
+            <View style={styles.scanTextWrap}>
+              {showSubtitleFlash ? (
+                <Text style={styles.subtitleLine}>✓ Subtitles downloaded successfully</Text>
+              ) : (
                 <Text style={styles.analysingLabel}>
                   Analysing from{" "}
-                  <Text style={styles.domainHighlight}>[{currentDomain || "…"}]</Text>
+                  <Text style={styles.domainHighlight}>
+                    {currentDomain ? `[${currentDomain}]` : "[…]"}
+                  </Text>
                 </Text>
-                {subtitlesDone && (
-                  <Text style={styles.subtitleLine}>Subtitles downloaded successfully</Text>
-                )}
-              </View>
+              )}
             </View>
+          </View>
 
-            {/* Source dots strip */}
-            <View style={styles.dotsStrip}>
-              {SOURCE_CHAIN.slice(0, 6).map((s) => {
-                const isDone = SOURCE_CHAIN.findIndex(x => x.name === currentDomain) >
-                               SOURCE_CHAIN.findIndex(x => x.name === s.name);
-                const isCurrent = s.name === currentDomain;
-                return (
-                  <View key={s.name} style={styles.dotItem}>
-                    <View style={[
+          {/* Source dots strip */}
+          <View style={styles.dotsStrip}>
+            {SOURCE_CHAIN.slice(0, 8).map((s) => {
+              const chainIdx = SOURCE_CHAIN.indexOf(currentDomain);
+              const dotIdx = SOURCE_CHAIN.indexOf(s);
+              const isDone = dotIdx !== -1 && chainIdx !== -1 && dotIdx < chainIdx;
+              const isCurrent = s === currentDomain;
+              return (
+                <View key={s} style={styles.dotItem}>
+                  <View
+                    style={[
                       styles.dot,
                       isDone && styles.dotDone,
                       isCurrent && styles.dotActive,
-                    ]} />
-                    <Text style={[styles.dotLabel, isCurrent && styles.dotLabelActive]}>
-                      {s.slug}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : (
-          /* ── Found phase — source info card ─────────────────────────── */
-          <Animated.View style={[styles.foundBody, { opacity: fadeAnim }]}>
-            {/* Top row: title + close */}
-            <View style={styles.foundTitleRow}>
-              <Text style={styles.foundTitle} numberOfLines={1}>{displayTitle}</Text>
-              <Pressable onPress={() => { clearAll(); onComplete(); }} hitSlop={10}>
-                <Text style={styles.closeX}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* URL */}
-            {sourceMeta && (
-              <Text style={styles.foundUrl} numberOfLines={2} selectable>
-                {sourceMeta.url}
-              </Text>
-            )}
-
-            <View style={styles.metaDivider} />
-
-            {/* Metadata rows */}
-            {sourceMeta && (
-              <>
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>Source:</Text>
-                  <Text style={styles.metaValue}>
-                    <Text style={styles.metaLink}>{sourceMeta.domain}</Text>
-                    {" etc."}
+                    ]}
+                  />
+                  <Text style={[styles.dotLabel, isCurrent && styles.dotLabelActive]}>
+                    {s.split(".")[0]}
                   </Text>
                 </View>
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>Size:</Text>
-                  <Text style={styles.metaValue}>{sourceMeta.size}MB</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>Date:</Text>
-                  <Text style={styles.metaValue}>{sourceMeta.date}</Text>
-                </View>
+              );
+            })}
+          </View>
 
-                <View style={styles.metaDivider} />
-
-                <Text style={styles.uploaderText}>
-                  The Source is uploaded by{" "}
-                  <Text style={styles.uploaderName}>{sourceMeta.uploader}</Text>
-                  {" etc."}
-                </Text>
-
-                {/* Auto-close progress bar */}
-                <AutoCloseBar durationMs={2000} color="#4FC3F7" />
-              </>
-            )}
-          </Animated.View>
-        )}
+          {/* Status line */}
+          <View style={styles.statusRow}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>
+              {showSubtitleFlash
+                ? "Stream ready — launching player"
+                : "Racing 50+ sources in parallel…"}
+            </Text>
+          </View>
+        </View>
       </Animated.View>
     </Modal>
   );
 }
 
-// ─── Thin auto-close progress bar ─────────────────────────────────────────────
-function AutoCloseBar({ durationMs, color }: { durationMs: number; color: string }) {
-  const widthAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(widthAnim, {
-      toValue: 100,
-      duration: durationMs,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-  }, []);
-
-  return (
-    <View style={styles.autoBarTrack}>
-      <Animated.View
-        style={[
-          styles.autoBarFill,
-          { width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }), backgroundColor: color },
-        ]}
-      />
-    </View>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.65)",
   },
   sheet: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(12,12,12,0.98)",
+    backgroundColor: "rgba(10,10,10,0.99)",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 40,
+    paddingBottom: 44,
     paddingTop: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
@@ -323,17 +223,30 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: "rgba(255,255,255,0.15)",
-    marginBottom: 14,
+    marginBottom: 16,
   },
-
-  // ── Scanning phase
-  scanBody: { paddingHorizontal: 18, gap: 16 },
+  body: {
+    paddingHorizontal: 20,
+    gap: 14,
+  },
+  movieTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 2,
+  },
   scanRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
+    backgroundColor: "rgba(229,9,20,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(229,9,20,0.18)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  scanTextWrap: { flex: 1, gap: 6 },
+  scanTextWrap: { flex: 1 },
   analysingLabel: {
     color: "#d4d4d4",
     fontSize: 14,
@@ -341,13 +254,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   domainHighlight: {
-    color: "#4FC3F7",
+    color: "#E50914",
     fontFamily: "Inter_700Bold",
   },
   subtitleLine: {
-    color: "#a3a3a3",
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    color: "#4ade80",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
   },
   dotsStrip: {
     flexDirection: "row",
@@ -356,86 +270,24 @@ const styles = StyleSheet.create({
   },
   dotItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#2a2a2a" },
-  dotActive: { backgroundColor: "#FBBF24" },
+  dotActive: { backgroundColor: "#E50914" },
   dotDone: { backgroundColor: "#22c55e" },
   dotLabel: { color: "#404040", fontSize: 10, fontFamily: "Inter_400Regular" },
-  dotLabelActive: { color: "#FBBF24", fontFamily: "Inter_600SemiBold" },
-
-  // ── Found phase
-  foundBody: { paddingHorizontal: 18, gap: 0 },
-  foundTitleRow: {
+  dotLabelActive: { color: "#E50914", fontFamily: "Inter_600SemiBold" },
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
+    gap: 7,
   },
-  foundTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    flex: 1,
-    marginRight: 10,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#E50914",
   },
-  closeX: {
-    color: "#737373",
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
-  foundUrl: {
-    color: "#737373",
+  statusText: {
+    color: "#525252",
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    lineHeight: 16,
-    marginBottom: 10,
-  },
-  metaDivider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    marginVertical: 10,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-    gap: 8,
-  },
-  metaKey: {
-    color: "#737373",
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    width: 54,
-  },
-  metaValue: {
-    color: "#d4d4d4",
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    flex: 1,
-  },
-  metaLink: {
-    color: "#4FC3F7",
-    fontFamily: "Inter_600SemiBold",
-  },
-  uploaderText: {
-    color: "#737373",
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 18,
-  },
-  uploaderName: {
-    color: "#a3a3a3",
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  // Auto-close progress bar
-  autoBarTrack: {
-    marginTop: 14,
-    height: 2,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 1,
-    overflow: "hidden",
-  },
-  autoBarFill: {
-    height: "100%",
-    borderRadius: 1,
   },
 });

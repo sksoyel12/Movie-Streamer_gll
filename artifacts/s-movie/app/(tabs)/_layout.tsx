@@ -74,11 +74,11 @@ function ProfileIcon({ color, focused }: { color: string; focused: boolean }) {
   );
 }
 
-function GamesIcon({ color, focused }: { color: string; focused: boolean }) {
+function ClipsIcon({ color, focused }: { color: string; focused: boolean }) {
   return (
     <NetflixTabIcon focused={focused}>
       <Ionicons
-        name={focused ? "game-controller" : "game-controller-outline"}
+        name={focused ? "play-circle" : "play-circle-outline"}
         size={22}
         color={color}
       />
@@ -187,17 +187,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="clips"
+        options={{
+          title: t.tabClips,
+          tabBarIcon: ({ color, focused }) => <ClipsIcon color={color} focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: t.tabSearch,
           tabBarIcon: ({ color, focused }) => <SearchIcon color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="games"
-        options={{
-          title: t.tabGames,
-          tabBarIcon: ({ color, focused }) => <GamesIcon color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -207,6 +207,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => <ProfileIcon color={color} focused={focused} />,
         }}
       />
+      <Tabs.Screen name="games" options={{ href: null }} />
       <Tabs.Screen name="originals" options={{ href: null }} />
       <Tabs.Screen name="sources" options={{ href: null }} />
     </Tabs>

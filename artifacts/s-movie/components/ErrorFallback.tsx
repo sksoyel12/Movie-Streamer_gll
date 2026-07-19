@@ -49,7 +49,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background ?? "#0a0a0a" }]}>
       {__DEV__ ? (
         <Pressable
           onPress={() => setIsModalVisible(true)}

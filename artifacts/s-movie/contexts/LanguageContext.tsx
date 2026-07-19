@@ -34,6 +34,7 @@ export type Translations = {
   tabNewHot: string;
   tabSearch: string;
   tabGames: string;
+  tabClips: string;
   tabProfile: string;
 
   profileTitle: string;
@@ -93,6 +94,7 @@ const EN: Translations = {
   tabNewHot: "New & Hot",
   tabSearch: "Search",
   tabGames: "Games",
+  tabClips: "Clips",
   tabProfile: "My Profile",
 
   profileTitle: "My Profile",
@@ -152,6 +154,7 @@ const HI: Translations = {
   tabNewHot: "नया और हॉट",
   tabSearch: "खोज",
   tabGames: "गेम्स",
+  tabClips: "क्लिप्स",
   tabProfile: "मेरी प्रोफाइल",
 
   profileTitle: "मेरी प्रोफाइल",

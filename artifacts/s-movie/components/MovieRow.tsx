@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { saveHomeCache, loadHomeCache } from "@/lib/homeCache";
+import { prefetchStream } from "@/lib/backgroundPrefetch";
 
 // Splits "👍 Some Title" → { emoji: "👍 ", text: "Some Title" }
 // Needed because Inter font has no emoji glyphs — emoji must render in system font.
@@ -47,18 +48,40 @@ const CARD_GAP = 10;
 const ITEM_STRIDE = CARD_W + CARD_GAP;
 
 
-// ─── Fresh-content badge helper ───────────────────────────────────────────────
-// Only shows "New Episode / Watch Now" for TV shows with a new ep in last 7 days.
-// "Recently Added" badge is intentionally removed per design spec.
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+// ─── Content badge helpers ─────────────────────────────────────────────────────
+// Priority order: NEW EPISODE > NEW SEASON > TRENDING
+// Only ONE badge per poster. TOP 10 overrides all (handled separately, top-right).
+const SEVEN_DAYS_MS  = 7  * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 function getFreshBadge(m: any): "NEW EPISODE" | null {
   const now = Date.now();
-  // TV: last_air_date = most recent episode air date
   if (m.last_air_date) {
     const d = new Date(m.last_air_date).getTime();
     if (!isNaN(d) && now - d <= SEVEN_DAYS_MS && d <= now) return "NEW EPISODE";
   }
+  return null;
+}
+
+/**
+ * Returns the single highest-priority ribbon badge label for a card.
+ * Red ribbon placed at bottom-left of the poster (spec: #E50914, 6-8px radius,
+ * 6px H / 3px V padding, white bold text).
+ */
+function getContentBadge(m: any): "NEW EPISODE" | "NEW SEASON" | "TRENDING" | null {
+  const now = Date.now();
+  // 1. NEW EPISODE — last_air_date within 7 days
+  if (m.last_air_date) {
+    const d = new Date(m.last_air_date).getTime();
+    if (!isNaN(d) && now - d <= SEVEN_DAYS_MS && d <= now) return "NEW EPISODE";
+  }
+  // 2. NEW SEASON — series with >1 season and first_air_date within 30 days
+  if (m.first_air_date && (m.number_of_seasons ?? 1) > 1) {
+    const d = new Date(m.first_air_date).getTime();
+    if (!isNaN(d) && now - d <= THIRTY_DAYS_MS && d <= now) return "NEW SEASON";
+  }
+  // 3. TRENDING — popularity above threshold (TMDB's score, typically 100+ = trending)
+  if ((m.popularity ?? 0) > 150) return "TRENDING";
   return null;
 }
 
@@ -89,15 +112,23 @@ const GlowCard = React.memo(function GlowCard({ m, index, showTop10Badge, rowTit
     ]).start();
   }, []);
 
+  const glowCardType: "movie" | "tv" =
+    (m as any).mediaType ?? (rowTitle.toLowerCase().includes("shows") ? "tv" : "movie");
+  const glowCardTmdbId = (m as any).tmdbId as number | undefined;
+
   return (
     <Pressable
       onPress={() => {
         haptic.light();
+        // Background-prefetch stream sources as user navigates to detail
+        if (glowCardTmdbId) {
+          prefetchStream(glowCardTmdbId, glowCardType);
+        }
         router.push({
           pathname: "/movie/[id]",
           params: {
             id: String(m.id),
-            type: (m as any).mediaType ?? (rowTitle.toLowerCase().includes("shows") ? "tv" : "movie"),
+            type: glowCardType,
             ...(m.hdhubUrl ? { hdhubUrl: m.hdhubUrl } : {}),
             poster_path: posterUri ?? "",
             title_param: m.title ?? "",
@@ -136,17 +167,20 @@ const GlowCard = React.memo(function GlowCard({ m, index, showTop10Badge, rowTit
             <Text style={styles.top10Text}>TOP{"\n"}10</Text>
           </View>
         ) : null}
-        {/* New Episode / Watch Now badge — Netflix style */}
-        {getFreshBadge(m) === "NEW EPISODE" && (
-          <View style={styles.newEpBadge} pointerEvents="none">
-            <Text style={styles.newEpLine1}>New Episode</Text>
-            <Text style={styles.newEpLine2}>Watch Now</Text>
-          </View>
-        )}
+        {/* Red ribbon badge — bottom-left, single highest-priority label */}
+        {!((m as CardItem & { isTop10?: boolean }).isTop10 && showTop10Badge) && (() => {
+          const badge = getContentBadge(m);
+          if (!badge) return null;
+          return (
+            <View style={styles.ribbonBadge} pointerEvents="none">
+              <Text style={styles.ribbonBadgeText}>{badge}</Text>
+            </View>
+          );
+        })()}
         {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
         <HindiBadge
           tmdbId={(m as any).tmdbId ?? m.id}
-          mediaType={(m as any).mediaType ?? (rowTitle.toLowerCase().includes("shows") ? "tv" : "movie")}
+          mediaType={glowCardType}
           style={styles.hindiBadge}
           textStyle={styles.hindiBadgeText}
         />
@@ -347,12 +381,15 @@ const RowCard = React.memo(function RowCard({
   // requests per page load, causing 429 rate-limit errors).
   const imageUri = baseImageUri;
   const hasTop10 = showTop10Badge && (m as CardItem & { isTop10?: boolean }).isTop10;
-  const newEpBadge = getFreshBadge(m);
 
   return (
     <Pressable
       onPress={() => {
         haptic.light();
+        // Background-prefetch stream sources while user navigates to detail
+        if (tmdbId) {
+          prefetchStream(tmdbId, mediaType);
+        }
         router.push({
           pathname: "/movie/[id]",
           params: {
@@ -387,13 +424,16 @@ const RowCard = React.memo(function RowCard({
               <Text style={styles.top10Text}>TOP{"\n"}10</Text>
             </View>
           )}
-          {/* New Episode / Watch Now — Netflix-style bottom strip */}
-          {!hasTop10 && newEpBadge === "NEW EPISODE" && (
-            <View style={styles.newEpBadge} pointerEvents="none">
-              <Text style={styles.newEpLine1}>New Episode</Text>
-              <Text style={styles.newEpLine2}>Watch Now</Text>
-            </View>
-          )}
+          {/* Red ribbon badge — bottom-left, single highest-priority label */}
+          {!hasTop10 && (() => {
+            const badge = getContentBadge(m);
+            if (!badge) return null;
+            return (
+              <View style={styles.ribbonBadge} pointerEvents="none">
+                <Text style={styles.ribbonBadgeText}>{badge}</Text>
+              </View>
+            );
+          })()}
           {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
           <HindiBadge
             tmdbId={tmdbId ?? m.id}
@@ -920,31 +960,28 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Netflix-style "New Episode / Watch Now" badge — bottom of card ──────────
-  newEpBadge: {
-    position:        "absolute",
-    bottom:          0,
-    left:            0,
-    right:           0,
-    backgroundColor: "#E50914",
-    paddingVertical:  5,
-    paddingHorizontal: 6,
-    alignItems:      "center",
-    justifyContent:  "center",
+  // ── Red ribbon badge — bottom-left corner (Module 4 spec) ────────────────────
+  // #E50914 red, white bold text, 6-8px rounded corners, 6px H / 3px V padding,
+  // small shadow, ONE badge per poster.
+  ribbonBadge: {
+    position:          "absolute",
+    bottom:             6,
+    left:               6,
+    backgroundColor:   "#E50914",
+    paddingHorizontal:  6,
+    paddingVertical:    3,
+    borderRadius:       7,
+    zIndex:             10,
+    shadowColor:        "#000",
+    shadowOffset:       { width: 0, height: 2 },
+    shadowOpacity:      0.45,
+    shadowRadius:       3,
+    elevation:          5,
   },
-  newEpLine1: {
+  ribbonBadgeText: {
     color:         "#fff",
-    fontSize:      8.5,
     fontFamily:    "Inter_700Bold",
+    fontSize:      8,
     letterSpacing: 0.4,
-    textAlign:     "center",
-  },
-  newEpLine2: {
-    color:         "rgba(255,255,255,0.82)",
-    fontSize:      7.5,
-    fontFamily:    "Inter_500Medium",
-    letterSpacing: 0.2,
-    textAlign:     "center",
-    marginTop:     1,
   },
 });

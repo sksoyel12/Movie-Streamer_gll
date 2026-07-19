@@ -1,3 +1,4 @@
+- [S-Movie 6-module overhaul](smovie-6module-overhaul.md) — Nav (Clips tab replaces Games), ribbon badges, 600ms AnalysingModal, background prefetch lib; see file for integration notes
 - [Full security stack](security-stack.md) — 6-layer API + mobile integrity; velocity detect, HMAC request signing, emulator block; override code SMOVIE-SEC-OVERRIDE-2026
 - [API security layers](api-security-layers.md) — Firebase JWT auth + CORS whitelist + rate limiting + anti-bot + AES URL encryption; route structure and mobile integration
 - [TMDB consolidation](tmdb-consolidation.md) — all TMDB API calls must go through lib/tmdb.ts; never add a new TMDB_KEY constant or direct fetch in any other file
