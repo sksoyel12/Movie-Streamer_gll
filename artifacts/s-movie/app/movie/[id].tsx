@@ -963,7 +963,7 @@ export default function MovieDetail() {
         <View style={styles.container}>
           {/* Black header — back arrow only */}
           <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
-            <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} hitSlop={12} style={styles.netflixBackBtn}>
               <Ionicons name="arrow-back" size={24} color="#fff" />
             </Pressable>
           </View>
@@ -981,7 +981,7 @@ export default function MovieDetail() {
       <View style={styles.container}>
         {/* Black header — back arrow only */}
         <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} hitSlop={12} style={styles.netflixBackBtn}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </Pressable>
         </View>
@@ -1030,7 +1030,7 @@ export default function MovieDetail() {
     <View style={styles.container}>
       {/* ── Fixed black header — back arrow only, never overlaps poster ── */}
       <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} hitSlop={12} style={styles.netflixBackBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
       </View>
@@ -1709,19 +1709,20 @@ const styles = StyleSheet.create({
   centerContent: { alignItems: "center", justifyContent: "center" },
 
   // ── Netflix-style top header — pure black, back arrow only ────────────────
+  // No fixed height — paddingTop comes from insets.top inline, content height
+  // is determined by the 44px button. Fixed height + paddingTop crushes the tap target.
   netflixHeader: {
     backgroundColor: "#000",
     flexDirection: "row",
     alignItems: "center",
-    height: 52,
     paddingHorizontal: 4,
+    paddingBottom: 6,
   },
   netflixBackBtn: {
     width: 44,
     height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 22,
   },
 
   // ── Red signature divider between hero and body ───────────────────────────
