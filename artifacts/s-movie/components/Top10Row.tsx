@@ -1,11 +1,9 @@
 import { router } from "expo-router";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -76,59 +74,19 @@ function mapResults(results: TMDBPage["results"]): Movie[] {
   );
 }
 
-// ── Glass Rank Badge ──────────────────────────────────────────────────────────
-// iOS/web: BlurView gives real backdrop blur.
-// Android: layered semi-transparent Views simulate the glass sheen.
-function GlassRankBadge({ rank }: { rank: number }) {
-  const label = String(rank);
-
-  const inner = (
-    <>
-      {/* Top-left sheen highlight */}
-      <LinearGradient
-        colors={["rgba(255,255,255,0.18)", "rgba(255,255,255,0.05)", "transparent"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.6, y: 1 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      {/* Soft bottom glow */}
-      <LinearGradient
-        colors={["transparent", "rgba(255,255,255,0.06)"]}
-        start={{ x: 0, y: 0.6 }}
-        end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      {/* The rank digit */}
-      <Text style={s.rankText} numberOfLines={1} allowFontScaling={false}>
-        {label}
-      </Text>
-    </>
-  );
-
-  if (Platform.OS === "android") {
-    // Android fallback — layered semi-transparent Views
-    return (
-      <View style={s.badgeOuter} pointerEvents="none">
-        <View style={[s.badgeShell, s.badgeAndroid]}>
-          {inner}
-        </View>
-      </View>
-    );
-  }
-
+// ── Netflix-style Rank Number ─────────────────────────────────────────────────
+// Large bold number that sits behind the poster — exactly like Netflix Top 10.
+function RankNumber({ rank }: { rank: number }) {
   return (
-    <View style={s.badgeOuter} pointerEvents="none">
-      <BlurView
-        intensity={Platform.OS === "web" ? 30 : 22}
-        tint="dark"
-        style={s.badgeShell}
+    <View style={s.rankOuter} pointerEvents="none">
+      <Text
+        style={s.rankText}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        allowFontScaling={false}
       >
-        {inner}
-      </BlurView>
-      {/* Crisp white border on top of BlurView */}
-      <View style={s.badgeBorder} pointerEvents="none" />
+        {String(rank)}
+      </Text>
     </View>
   );
 }
@@ -174,8 +132,8 @@ function Top10Item({
       onPressOut={handlePressOut}
       style={s.item}
     >
-      {/* Glass rank badge — behind the poster */}
-      <GlassRankBadge rank={rank} />
+      {/* Netflix-style rank number — behind the poster */}
+      <RankNumber rank={rank} />
 
       {/* Poster — overlaps the badge from the right */}
       <Animated.View style={[s.posterCol, { transform: [{ scale }] }]}>
@@ -357,62 +315,34 @@ const s = StyleSheet.create({
     height:        CARD_H,
   },
 
-  // ── Glass badge ───────────────────────────────────────────────────────────
-  // Outer wrapper: absolute, anchored bottom-left, fixed size
-  badgeOuter: {
-    position:     "absolute",
-    left:         0,
-    bottom:       0,
-    width:        BADGE_W,
-    height:       CARD_H,
-    zIndex:       1,
-    borderRadius: 12,
-    overflow:     "hidden",
-    // Soft ambient glow behind the glass
-    shadowColor:  "rgba(255,255,255,0.08)",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 14,
+  // ── Netflix-style rank number ─────────────────────────────────────────────
+  // Anchored bottom-left, sits behind the poster (lower zIndex)
+  rankOuter: {
+    position:       "absolute",
+    left:           0,
+    bottom:         0,
+    width:          BADGE_W,
+    height:         CARD_H,
+    zIndex:         1,
+    justifyContent: "flex-end",
+    alignItems:     "center",
+    paddingBottom:  2,
   },
 
-  // BlurView / glass shell that fills badgeOuter
-  badgeShell: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent:  "flex-end",
-    alignItems:      "center",
-    paddingBottom:   2,
-    overflow:        "hidden",
-    borderRadius:    12,
-  },
-
-  // Android solid fallback
-  badgeAndroid: {
-    backgroundColor: "rgba(22,22,30,0.72)",
-    borderWidth:     1,
-    borderColor:     "rgba(255,255,255,0.12)",
-  },
-
-  // Crisp white border ring drawn over BlurView (iOS/web)
-  badgeBorder: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius:  12,
-    borderWidth:   1,
-    borderColor:   "rgba(255,255,255,0.13)",
-  },
-
-  // The rank digit inside the glass
+  // The rank digit — solid white, massive, bold, with dark shadow for depth
   rankText: {
-    color:              "rgba(255,255,255,0.22)",
+    color:              "#ffffff",
     fontSize:           RANK_FONT,
     lineHeight:         RANK_LINE,
     fontFamily:         "Inter_900Black",
     letterSpacing:      -7,
     includeFontPadding: false,
     textAlign:          "center",
-    // Soft white glow
-    textShadowColor:    "rgba(255,255,255,0.18)",
-    textShadowOffset:   { width: 0, height: 0 },
-    textShadowRadius:   24,
+    width:              BADGE_W,
+    // Dark shadow gives the outline/stroke effect Netflix uses
+    textShadowColor:    "rgba(0,0,0,0.9)",
+    textShadowOffset:   { width: 2, height: 2 },
+    textShadowRadius:   5,
   },
 
   // ── Poster ────────────────────────────────────────────────────────────────
