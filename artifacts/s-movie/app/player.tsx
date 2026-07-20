@@ -278,16 +278,16 @@ export default function PlayerScreen() {
         }
       }
 
-      // ── Step 3: Firebase admin-added direct video link ────────────────────────
+      // ── Step 3: Firebase admin-added direct video link (3s max timeout) ─────
       if (tmdbId) {
         try {
-          let firebaseLink: { directVideo: string } | null = null;
-          if (isTV) {
-            firebaseLink = await fetchEpisodeLink(tmdbId, s, e);
-          } else {
-            const mLinks = await fetchMovieLinks(tmdbId);
-            if (mLinks?.directVideo) firebaseLink = { directVideo: mLinks.directVideo };
-          }
+          const firebaseFetch = isTV
+            ? fetchEpisodeLink(tmdbId, s, e)
+            : fetchMovieLinks(tmdbId).then((mLinks) =>
+                mLinks?.directVideo ? { directVideo: mLinks.directVideo } : null,
+              );
+          const timeout = new Promise<null>((res) => setTimeout(() => res(null), 3000));
+          const firebaseLink = await Promise.race([firebaseFetch, timeout]);
           if (!cancelled && firebaseLink?.directVideo) {
             const fUrl = firebaseLink.directVideo;
             setStreamResult({

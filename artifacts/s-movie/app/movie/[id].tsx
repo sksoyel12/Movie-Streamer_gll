@@ -954,11 +954,7 @@ export default function MovieDetail() {
           <Feather name="arrow-down-circle" size={20} color="#fff" />
           <Text style={styles.downloadBtnText}>Download</Text>
         </Pressable>
-        {/* Subtle loading indicator below buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 }}>
-          <ActivityIndicator size="small" color="#E50914" />
-          <Text style={{ color: "#666", fontSize: 13, fontFamily: "Inter_400Regular" }}>Loading details…</Text>
-        </View>
+        {/* loading indicator removed */}
       </View>
     );
 
@@ -973,9 +969,8 @@ export default function MovieDetail() {
             <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
             <Ionicons name="close" size={20} color="#fff" />
           </Pressable>
-          <View style={[styles.hero, { height: instantHeroH, backgroundColor: "#0d0d0d", alignItems: "center", justifyContent: "center" }]}>
+          <View style={[styles.hero, { height: instantHeroH, backgroundColor: "#0d0d0d" }]}>
             <LinearGradient colors={["#1a1a2e", "#0d0d0d"]} style={StyleSheet.absoluteFill} />
-            <ActivityIndicator size="large" color="#E50914" />
           </View>
           <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
             {loadingBody}
