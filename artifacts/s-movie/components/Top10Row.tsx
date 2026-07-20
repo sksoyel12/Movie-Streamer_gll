@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -76,49 +77,102 @@ function mapResults(results: TMDBPage["results"]): Movie[] {
   );
 }
 
-// ── Netflix-style Rank Number — SVG outline approach ─────────────────────────
-// True transparent-fill + thick-stroke outline, exactly like Netflix Top 10.
-// react-native-svg gives us real text stroke which React Native Text cannot do.
+// ── Glassmorphism Rank Number ─────────────────────────────────────────────────
+// Frosted-glass panel behind the poster + SVG outline number on top.
+// iOS/web → real BlurView backdrop blur (glass sheen + gradient).
+// Android  → dark semi-transparent fallback (BlurView unreliable on Android).
 function RankNumber({ rank }: { rank: number }) {
-  const label  = String(rank);
-  const isDouble = label.length > 1;               // "10" needs smaller font
-  const fontSize   = isDouble ? 108 : RANK_FONT;   // shrink for "10"
-  const strokeW    = isDouble ? 7   : 9;            // slightly thinner stroke on "10"
-  // Anchor text at bottom of SVG so all numbers sit on the same baseline
-  const textY = CARD_H - 6;
+  const label    = String(rank);
+  const isDouble = label.length > 1;
+  const fontSize = isDouble ? 108 : RANK_FONT;
+  const strokeW  = isDouble ? 7   : 9;
+  const textY    = CARD_H - 6;                     // baseline at bottom
+
+  // SVG — three layers for the glassmorphism number effect
+  const svgNumber = (
+    <Svg
+      width={BADGE_W}
+      height={CARD_H}
+      style={StyleSheet.absoluteFillObject as any}
+    >
+      {/* 1 — deep shadow: separates number from poster */}
+      <SvgText
+        x={BADGE_W / 2 + 3}
+        y={textY + 5}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight="900"
+        fill="none"
+        stroke="rgba(0,0,0,0.70)"
+        strokeWidth={strokeW + 7}
+        strokeLinejoin="round"
+      >
+        {label}
+      </SvgText>
+      {/* 2 — main glass fill: very slight frosted-white tint */}
+      <SvgText
+        x={BADGE_W / 2}
+        y={textY}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight="900"
+        fill="rgba(255,255,255,0.10)"
+        stroke="rgba(230,232,240,0.95)"
+        strokeWidth={strokeW}
+        strokeLinejoin="round"
+      >
+        {label}
+      </SvgText>
+      {/* 3 — inner-highlight: thin bright ring = glass sheen */}
+      <SvgText
+        x={BADGE_W / 2}
+        y={textY}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight="900"
+        fill="transparent"
+        stroke="rgba(255,255,255,0.38)"
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      >
+        {label}
+      </SvgText>
+    </Svg>
+  );
+
+  if (Platform.OS === "android") {
+    return (
+      <View style={s.rankOuter} pointerEvents="none">
+        {/* Android: solid semi-transparent panel simulates glass */}
+        <View style={[StyleSheet.absoluteFillObject, s.glassAndroid]} />
+        {svgNumber}
+      </View>
+    );
+  }
 
   return (
     <View style={s.rankOuter} pointerEvents="none">
-      <Svg width={BADGE_W} height={CARD_H}>
-        {/* Dark shadow layer — gives depth like Netflix */}
-        <SvgText
-          x={BADGE_W / 2 + 3}
-          y={textY + 4}
-          textAnchor="middle"
-          fontSize={fontSize}
-          fontWeight="900"
-          fill="none"
-          stroke="rgba(0,0,0,0.55)"
-          strokeWidth={strokeW + 4}
-          strokeLinejoin="round"
-        >
-          {label}
-        </SvgText>
-        {/* Main outline — transparent fill, white/light-grey stroke */}
-        <SvgText
-          x={BADGE_W / 2}
-          y={textY}
-          textAnchor="middle"
-          fontSize={fontSize}
-          fontWeight="900"
-          fill="transparent"
-          stroke="rgba(220,220,220,0.92)"
-          strokeWidth={strokeW}
-          strokeLinejoin="round"
-        >
-          {label}
-        </SvgText>
-      </Svg>
+      {/* Real frosted-glass blur — blurs the poster behind the badge */}
+      <BlurView
+        intensity={Platform.OS === "web" ? 18 : 26}
+        tint="dark"
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Glass sheen: diagonal light gradient from top-left */}
+      <LinearGradient
+        colors={[
+          "rgba(255,255,255,0.16)",
+          "rgba(255,255,255,0.06)",
+          "rgba(255,255,255,0.01)",
+        ]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      {/* Glass edge highlight — top + left border gives the "glass rim" look */}
+      <View style={s.glassBorder} pointerEvents="none" />
+      {svgNumber}
     </View>
   );
 }
@@ -347,34 +401,32 @@ const s = StyleSheet.create({
     height:        CARD_H,
   },
 
-  // ── Netflix-style rank number ─────────────────────────────────────────────
-  // Anchored bottom-left, sits behind the poster (lower zIndex)
+  // ── Glassmorphism rank number ─────────────────────────────────────────────
+  // Anchored bottom-left, sits behind the poster (lower zIndex).
+  // overflow:hidden clips the blur + gradient exactly to the badge bounds.
   rankOuter: {
-    position:       "absolute",
-    left:           0,
-    bottom:         0,
-    width:          BADGE_W,
-    height:         CARD_H,
-    zIndex:         1,
-    justifyContent: "flex-end",
-    alignItems:     "center",
-    paddingBottom:  2,
+    position: "absolute",
+    left:     0,
+    bottom:   0,
+    width:    BADGE_W,
+    height:   CARD_H,
+    zIndex:   1,
+    overflow: "hidden",
   },
 
-  // The rank digit — solid white, massive, bold, with dark shadow for depth
-  rankText: {
-    color:              "#ffffff",
-    fontSize:           RANK_FONT,
-    lineHeight:         RANK_LINE,
-    fontFamily:         "Inter_900Black",
-    letterSpacing:      -7,
-    includeFontPadding: false,
-    textAlign:          "center",
-    width:              BADGE_W,
-    // Dark shadow gives the outline/stroke effect Netflix uses
-    textShadowColor:    "rgba(0,0,0,0.9)",
-    textShadowOffset:   { width: 2, height: 2 },
-    textShadowRadius:   5,
+  // Android fallback — dark semi-transparent panel with a faint border
+  glassAndroid: {
+    backgroundColor: "rgba(10,12,22,0.72)",
+    borderRightWidth: 1,
+    borderColor:     "rgba(255,255,255,0.12)",
+  },
+
+  // Glass rim — top + right edge highlight (the "glass edge" catch-light)
+  glassBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopWidth:   1,
+    borderRightWidth: 1,
+    borderColor:      "rgba(255,255,255,0.18)",
   },
 
   // ── Poster ────────────────────────────────────────────────────────────────
