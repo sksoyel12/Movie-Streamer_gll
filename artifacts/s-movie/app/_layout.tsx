@@ -9,10 +9,6 @@ import {
   Inter_900Black,
   useFonts,
 } from "@expo-google-fonts/inter";
-import {
-  DancingScript_400Regular,
-  DancingScript_700Bold,
-} from "@expo-google-fonts/dancing-script";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
@@ -20,7 +16,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Alert, InteractionManager, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Alert, Image, InteractionManager, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -94,7 +90,15 @@ if (Platform.OS === "web" && typeof document !== "undefined") {
   }
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,   // 5 min — don't re-fetch if data is fresh
+      gcTime:    15 * 60 * 1000,  // 15 min — keep unused data in memory
+      retry: 1,
+    },
+  },
+});
 
 function RootLayoutNav() {
   return (
@@ -333,8 +337,6 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_800ExtraBold,
     Inter_900Black,
-    DancingScript_400Regular,
-    DancingScript_700Bold,
   });
 
   // Hide the native splash only after fonts are determined (loaded OR errored).
@@ -498,7 +500,17 @@ export default function RootLayout() {
   }, []);
 
   if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: "#000000" }} />;
+    // Show branded splash while fonts download — matches the native splash screen
+    // so there's no black flash between the native splash and the app UI.
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0a1628", alignItems: "center", justifyContent: "center" }}>
+        <Image
+          source={require("@/assets/images/splash.png")}
+          style={{ width: "100%", height: "100%", position: "absolute" }}
+          resizeMode="cover"
+        />
+      </View>
+    );
   }
 
   return (

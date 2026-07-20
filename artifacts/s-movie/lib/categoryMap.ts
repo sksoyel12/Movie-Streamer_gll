@@ -40,7 +40,7 @@ export const HOME_CATEGORIES: HomeCategory[] = [
   // 3
   { kind: "movieRow", title: "Your Next Watch",                                     fetcher: tmdb.yourNextWatch,                      mediaType: "tv"    },
   // 4
-  { kind: "movieRow", title: "Korean TV Shows",                                     fetcher: tmdb.koreanDramasIN,                     mediaType: "tv"    },
+  { kind: "movieRow", title: "Korean TV Shows & Drama",                              fetcher: tmdb.koreanDramasIN,                     mediaType: "tv"    },
   // 5
   { kind: "movieRow", title: "Romantic Shows",                                      fetcher: tmdb.romanticShows,                      mediaType: "tv"    },
   // 6
@@ -56,7 +56,7 @@ export const HOME_CATEGORIES: HomeCategory[] = [
   // 11
   { kind: "movieRow", title: "Get in on the action",                                fetcher: tmdb.getInOnAction,                      mediaType: "tv"    },
   // 12
-  { kind: "movieRow", title: "New Releases",                                        fetcher: tmdb.nowPlaying,                         mediaType: "movie" },
+  { kind: "movieRow", title: "New Releases Netflix",                                 fetcher: tmdb.nowPlaying,                         mediaType: "movie" },
   // 13
   { kind: "movieRow", title: "First Love Romance",                                  fetcher: tmdb.firstLoveRomance,                   mediaType: "tv"    },
   // 14
