@@ -961,14 +961,12 @@ export default function MovieDetail() {
     if (!navPosterSource) {
       return (
         <View style={styles.container}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={[styles.heroCloseBtn, { top: insets.top > 0 ? insets.top + 6 : 18, position: "absolute", zIndex: 20 }]}
-          >
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-            <Ionicons name="close" size={20} color="#fff" />
-          </Pressable>
+          {/* Black header — back arrow only */}
+          <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
+            <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </Pressable>
+          </View>
           <View style={[styles.hero, { height: instantHeroH, backgroundColor: "#0d0d0d" }]}>
             <LinearGradient colors={["#1a1a2e", "#0d0d0d"]} style={StyleSheet.absoluteFill} />
           </View>
@@ -981,6 +979,12 @@ export default function MovieDetail() {
 
     return (
       <View style={styles.container}>
+        {/* Black header — back arrow only */}
+        <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </Pressable>
+        </View>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={{ paddingBottom: 60 }}
@@ -997,18 +1001,10 @@ export default function MovieDetail() {
             />
             {/* Gradient: poster visible at top, fades to black at bottom */}
             <LinearGradient
-              colors={["rgba(0,0,0,0.10)", "rgba(0,0,0,0.45)", "#000"]}
+              colors={["transparent", "rgba(0,0,0,0.45)", "#000"]}
               locations={[0, 0.6, 1]}
               style={StyleSheet.absoluteFill}
             />
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={12}
-              style={[styles.heroCloseBtn, { top: insets.top > 0 ? insets.top + 6 : 18 }]}
-            >
-              <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-              <Ionicons name="close" size={20} color="#fff" />
-            </Pressable>
           </View>
           {loadingBody}
         </ScrollView>
@@ -1032,16 +1028,23 @@ export default function MovieDetail() {
 
   return (
     <View style={styles.container}>
+      {/* ── Fixed black header — back arrow only, never overlaps poster ── */}
+      <View style={[styles.netflixHeader, { paddingTop: insets.top }]}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.netflixBackBtn}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </Pressable>
+      </View>
+
       <ScrollView
         ref={mainScrollRef}
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Hero — landscape 16:9 backdrop, Netflix detail style ──── */}
+        {/* ── Hero — starts below header, no back-button overlay ──── */}
         <View style={[styles.hero, { height: heroHeight }]}>
 
-          {/* Backdrop (wide landscape key art) — ONLY TMDB backdrop, never portrait poster */}
+          {/* Backdrop — landscape key art */}
           <SmartImage
             source={(movie?.hero ?? require("@/assets/images/hero.png")) as any}
             style={StyleSheet.absoluteFill}
@@ -1050,23 +1053,12 @@ export default function MovieDetail() {
             cachePolicy="memory-disk"
           />
 
-          {/* Gradient: cinematic — soft dark top edges + strong black fade at bottom */}
+          {/* Gradient: fades to black only at bottom — header is above so no top darkening needed */}
           <LinearGradient
-            colors={["rgba(0,0,0,0.38)", "transparent", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.68)", "#000"]}
-            locations={[0, 0.18, 0.52, 0.80, 1]}
+            colors={["transparent", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.70)", "#000"]}
+            locations={[0, 0.45, 0.80, 1]}
             style={StyleSheet.absoluteFill}
           />
-
-          {/* X close button — top right */}
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={[styles.heroCloseBtn, { top: insets.top > 0 ? insets.top + 6 : 18 }]}
-          >
-            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-            <Ionicons name="close" size={20} color="#fff" />
-          </Pressable>
-
 
           {/* Bottom row: Trailer chip only */}
           <View style={styles.heroBottomRow}>
@@ -1089,6 +1081,9 @@ export default function MovieDetail() {
             </Pressable>
           </View>
         </View>
+
+        {/* ── Red divider line — Netflix signature between hero & body ── */}
+        <View style={styles.redDivider} />
 
         {/* ── Body — seamless Netflix layout ───────────────────────── */}
         <View style={styles.body}>
@@ -1712,6 +1707,28 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   scroll: { flex: 1 },
   centerContent: { alignItems: "center", justifyContent: "center" },
+
+  // ── Netflix-style top header — pure black, back arrow only ────────────────
+  netflixHeader: {
+    backgroundColor: "#000",
+    flexDirection: "row",
+    alignItems: "center",
+    height: 52,
+    paddingHorizontal: 4,
+  },
+  netflixBackBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+  },
+
+  // ── Red signature divider between hero and body ───────────────────────────
+  redDivider: {
+    height: 3,
+    backgroundColor: "#E50914",
+  },
   errorText: { color: "#fff", fontSize: 18, fontFamily: "Inter_500Medium" },
   backBtn: {
     marginTop: 14,
