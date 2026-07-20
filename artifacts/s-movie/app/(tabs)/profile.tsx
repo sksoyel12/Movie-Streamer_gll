@@ -678,6 +678,13 @@ export default function ProfileScreen() {
                 : undefined}
             />
             <SettingsRow
+              icon={<MaterialCommunityIcons name="database-search" size={21} color="#fff" />}
+              label="Source Catalog"
+              sub="109 streaming sources — Movies, Anime, Manga, Live"
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => router.push("/(tabs)/sources")}
+            />
+            <SettingsRow
               icon={<Ionicons name="settings-outline" size={21} color="#fff" />}
               label="Settings"
               sub="Preferences, playback, privacy & more"
