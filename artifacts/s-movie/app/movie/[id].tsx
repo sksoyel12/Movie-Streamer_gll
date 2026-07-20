@@ -233,6 +233,7 @@ export default function MovieDetail() {
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [allVideos, setAllVideos] = useState<Array<{ key: string; name: string; type: string; site: string; isHindi?: boolean }>>([]);
   const [isTrailerHindi, setIsTrailerHindi] = useState(false);
+  const [loadingVideos, setLoadingVideos] = useState(true);
 
   // User rating — persisted locally
   const [userRating, setUserRating] = useState<"down" | "up" | "love" | null>(null);
@@ -319,6 +320,20 @@ export default function MovieDetail() {
           ),
     [hasTmdbSeasonMeta, tmdbSeasonMeta, tmdbDetail, movie, isTV],
   );
+
+  // Detect unreleased / Coming Soon titles from TMDB detail
+  const isComingSoon = useMemo(() => {
+    const dateStr = tmdbDetail?.release_date ?? tmdbDetail?.first_air_date;
+    if (!dateStr || dateStr.length < 4) return false;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      d.setHours(0, 0, 0, 0);
+      return d > today;
+    } catch { return false; }
+  }, [tmdbDetail]);
 
   // Formatted duration label — "1h 58m" for movies, "2 Seasons" for TV
   const durationLabel = useMemo(() => {
@@ -646,7 +661,8 @@ export default function MovieDetail() {
             setAllVideos([{ key: enKey, name: `${title} — Official Trailer`, type: "Trailer", site: "YouTube", isHindi: false }]);
           }
         }
-      });
+      })
+      .finally(() => { if (!cancelled) setLoadingVideos(false); });
     return () => { cancelled = true; };
   }, [tmdbId, isTV]);
 
@@ -1053,7 +1069,8 @@ export default function MovieDetail() {
             <Ionicons name="close" size={20} color="#fff" />
           </Pressable>
 
-          {/* Center play button */}
+          {/* Center play button — hidden for Coming Soon */}
+          {!isComingSoon && (
           <Pressable
             onPress={() => {
               haptic.medium();
@@ -1068,6 +1085,7 @@ export default function MovieDetail() {
             <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.30)", borderRadius: 31 }} />
             <Ionicons name="play" size={28} color="#fff" style={{ marginLeft: 4 }} />
           </Pressable>
+          )}
 
           {/* Bottom row: Trailer chip only */}
           <View style={styles.heroBottomRow}>
@@ -1121,7 +1139,13 @@ export default function MovieDetail() {
             </Text>
           )}
 
-          {/* Play — solid red */}
+          {/* Play — solid red / Coming Soon badge */}
+          {isComingSoon ? (
+            <View style={styles.comingSoonBtn}>
+              <Ionicons name="time-outline" size={20} color="#fff" />
+              <Text style={styles.comingSoonBtnText}>Coming Soon</Text>
+            </View>
+          ) : (
           <Pressable
             onPress={() => {
               haptic.medium();
@@ -1139,6 +1163,7 @@ export default function MovieDetail() {
             <Ionicons name="play" size={20} color="#000" />
             <Text style={styles.playBtnText}>Play</Text>
           </Pressable>
+          )}
 
           {/* Download — dark gray */}
           <Pressable
@@ -1310,6 +1335,7 @@ export default function MovieDetail() {
                       </Text>
                     </Pressable>
                   )}
+                  {(loadingVideos || allVideos.length > 0) && (
                   <Pressable
                     onPress={() => setActiveSection("trailers")}
                     style={[styles.sectionTab, activeSection === "trailers" && styles.sectionTabActive]}
@@ -1318,6 +1344,7 @@ export default function MovieDetail() {
                       Trailers & More
                     </Text>
                   </Pressable>
+                  )}
                   <Pressable
                     onPress={() => setActiveSection("more")}
                     style={[styles.sectionTab, activeSection === "more" && styles.sectionTabActive]}
@@ -1935,6 +1962,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   playBtnText: { color: "#000", fontSize: 15, fontFamily: "Inter_700Bold", letterSpacing: 0.2 },
+
+  comingSoonBtn: {
+    backgroundColor: "#1a1a2e",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 6,
+    gap: 8,
+    marginBottom: 8,
+  },
+  comingSoonBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold", letterSpacing: 0.2 },
 
   // Netflix Download: slightly lighter than before, rounded same as Play
   downloadBtn: {

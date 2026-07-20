@@ -1,11 +1,18 @@
 /**
- * Clips — Short Clips & Trailers reel (TikTok/Reels-style vertical feed)
+ * Clips — Official Trailers & Clips reel (TikTok/Reels-style vertical feed)
  *
- * Fetches trending movies/shows from TMDB, grabs their trailers, and
- * presents them in a full-screen vertical scroll reel. Each card shows
- * the movie backdrop + title, and taps open the YoutubeEmbed trailer.
+ * • Fetches trending movies/shows from TMDB + caches their videos (24 h)
+ * • Snaps to each clip; auto-plays a muted preview when the card is visible
+ * • Tapping the clip card opens the full-screen S-MOVIE player
+ * • "Watch Trailer" opens the full-screen YouTube modal
+ * • Only items with a backdrop/poster are shown; section hidden when empty
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -17,24 +24,34 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ViewabilityConfig,
+  ViewToken,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import SmartImage from "@/components/SmartImage";
 import { tmdb, tmdbImg } from "@/lib/tmdb";
 import { haptic } from "@/lib/haptics";
+import {
+  getCachedVideos,
+  setCachedVideos,
+  type VideoEntry,
+} from "@/lib/trailerCache";
 
 const { width: W, height: H } = Dimensions.get("window");
 const CLIP_H = H;
 
 interface ClipItem {
   id: number;
+  tmdbId: number;
   title: string;
   backdropUri: string | null;
   posterUri: string | null;
   youtubeKey: string | null;
+  videoType: string; // "Trailer" | "Teaser" | "Clip"
   overview: string;
   mediaType: "movie" | "tv";
   year: string;
@@ -42,20 +59,41 @@ interface ClipItem {
   genre: string;
 }
 
-// ─── YouTube embed inline ──────────────────────────────────────────────────────
-// On web: render a plain <iframe> (react-native-webview is not available on web).
-// On native: lazily load react-native-webview via a safe try/require — any error
-// (e.g. running in Expo Go without the native module) falls back to the web path.
-function YoutubeEmbedInline({ videoKey }: { videoKey: string }) {
-  const embedUrl = `https://www.youtube.com/embed/${videoKey}?autoplay=1&rel=0&controls=1&modestbranding=1`;
+// ─── YouTube embed ────────────────────────────────────────────────────────────
+
+function YoutubeEmbed({
+  videoKey,
+  muted = false,
+  autoplay = false,
+}: {
+  videoKey: string;
+  muted?: boolean;
+  autoplay?: boolean;
+}) {
+  const params = [
+    autoplay ? "autoplay=1" : "autoplay=0",
+    muted ? "mute=1" : "mute=0",
+    "rel=0",
+    "controls=" + (muted ? "0" : "1"),
+    "modestbranding=1",
+    "playsinline=1",
+    muted ? `loop=1&playlist=${videoKey}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+  const embedUrl = `https://www.youtube.com/embed/${videoKey}?${params}`;
 
   if (Platform.OS === "web") {
-    // On web, use a standard iframe — no native module needed.
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
         <iframe
           src={embedUrl}
-          style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#000" } as any}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+            backgroundColor: "#000",
+          } as any}
           allow="autoplay; fullscreen"
           allowFullScreen
         />
@@ -63,26 +101,21 @@ function YoutubeEmbedInline({ videoKey }: { videoKey: string }) {
     );
   }
 
-  // Native: use react-native-webview safely
   let NativeWebView: React.ComponentType<any> | null = null;
-  try {
-    NativeWebView = require("react-native-webview").WebView;
-  } catch {
-    NativeWebView = null;
-  }
+  try { NativeWebView = require("react-native-webview").WebView; } catch {}
 
   if (!NativeWebView) {
-    // Fallback: open in external browser when module unavailable
     return (
       <View style={{ flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "#fff", fontSize: 14, textAlign: "center", paddingHorizontal: 32 }}>
-          Trailer player unavailable.{"\n"}Tap outside to close.
+        <Text style={{ color: "#fff", textAlign: "center", paddingHorizontal: 32 }}>
+          Trailer unavailable. Tap outside to close.
         </Text>
       </View>
     );
   }
 
-  const html = `<!DOCTYPE html><html><head><style>*{margin:0;padding:0}body{background:#000}</style></head><body><iframe width="100%" height="100%" src="${embedUrl}" frameborder="0" allowfullscreen allow="autoplay"></iframe></body></html>`;
+  const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;background:#000}html,body{width:100%;height:100%}iframe{width:100%;height:100%}</style></head><body><iframe src="${embedUrl}" frameborder="0" allowfullscreen allow="autoplay; fullscreen"></iframe></body></html>`;
+
   return (
     <NativeWebView
       source={{ html }}
@@ -90,53 +123,104 @@ function YoutubeEmbedInline({ videoKey }: { videoKey: string }) {
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
       javaScriptEnabled
+      scrollEnabled={false}
     />
   );
 }
 
-// ─── Single clip card ──────────────────────────────────────────────────────────
-const ClipCard = React.memo(function ClipCard({ item }: { item: ClipItem }) {
-  const [playing, setPlaying] = useState(false);
+// ─── Single clip card ─────────────────────────────────────────────────────────
+
+interface ClipCardProps {
+  item: ClipItem;
+  isVisible: boolean;
+}
+
+const ClipCard = React.memo(function ClipCard({ item, isVisible }: ClipCardProps) {
+  const [showTrailerModal, setShowTrailerModal] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const handlePlay = useCallback(() => {
+  // Tap on card → full-screen S-MOVIE player
+  const handleCardPress = useCallback(() => {
     haptic.medium();
-    if (item.youtubeKey) {
-      setPlaying(true);
-    } else {
-      router.push({
-        pathname: "/movie/[id]",
-        params: {
-          id: `tmdb-${item.id}`,
-          type: item.mediaType,
-          title_param: item.title,
-        },
-      });
-    }
+    router.push({
+      pathname: "/player",
+      params: {
+        id: `tmdb-${item.tmdbId}`,
+        type: item.mediaType,
+        title_param: item.title,
+      },
+    });
   }, [item]);
 
-  return (
-    <View style={[styles.card, { height: CLIP_H }]}>
-      {/* Background image */}
-      <SmartImage
-        source={item.backdropUri ? { uri: item.backdropUri } : item.posterUri ? { uri: item.posterUri } : null}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-      />
+  // "Watch Trailer" → YouTube modal
+  const handleTrailer = useCallback((e: any) => {
+    e.stopPropagation?.();
+    if (!item.youtubeKey) {
+      haptic.light();
+      router.push({
+        pathname: "/movie/[id]",
+        params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title },
+      });
+      return;
+    }
+    haptic.medium();
+    setShowTrailerModal(true);
+  }, [item]);
 
-      {/* Gradient overlay */}
+  // Type badge color
+  const typeBadgeColor =
+    item.videoType === "Teaser" ? "#F59E0B" :
+    item.videoType === "Clip"   ? "#8B5CF6" :
+    "#E50914";
+
+  return (
+    <Pressable
+      style={[styles.card, { height: CLIP_H }]}
+      onPress={handleCardPress}
+    >
+      {/* Muted auto-play preview when this card is visible */}
+      {isVisible && item.youtubeKey ? (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
+          <YoutubeEmbed videoKey={item.youtubeKey} muted autoplay />
+        </View>
+      ) : (
+        <SmartImage
+          source={
+            item.backdropUri
+              ? { uri: item.backdropUri }
+              : item.posterUri
+              ? { uri: item.posterUri }
+              : null
+          }
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+      )}
+
+      {/* Gradient overlay — always on top of media */}
       <LinearGradient
-        colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.0)", "rgba(0,0,0,0.85)"]}
+        colors={["rgba(0,0,0,0.10)", "rgba(0,0,0,0.0)", "rgba(0,0,0,0.82)"]}
         style={StyleSheet.absoluteFill}
         locations={[0, 0.4, 1]}
+        pointerEvents="none"
       />
 
       {/* Content */}
-      <View style={[styles.cardContent, { paddingBottom: insets.bottom + 90 }]}>
-        {/* Genre chip */}
-        <View style={styles.genreChip}>
-          <Text style={styles.genreText}>{item.genre}</Text>
+      <View
+        style={[styles.cardContent, { paddingBottom: insets.bottom + 90 }]}
+        pointerEvents="box-none"
+      >
+        {/* Genre + type badges */}
+        <View style={styles.badgeRow}>
+          <View style={styles.genreChip}>
+            <Text style={styles.genreText}>{item.genre}</Text>
+          </View>
+          {item.youtubeKey && (
+            <View style={[styles.typeBadge, { backgroundColor: typeBadgeColor + "CC" }]}>
+              <Text style={styles.typeBadgeText}>{item.videoType}</Text>
+            </View>
+          )}
         </View>
 
         {/* Title */}
@@ -159,12 +243,11 @@ const ClipCard = React.memo(function ClipCard({ item }: { item: ClipItem }) {
           <Text style={styles.overview} numberOfLines={3}>{item.overview}</Text>
         ) : null}
 
-        {/* Action row */}
-        <View style={styles.actionRow}>
-          {/* Play trailer */}
+        {/* Action row — stopPropagation so card press isn't triggered */}
+        <View style={styles.actionRow} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.playBtn}
-            onPress={handlePlay}
+            onPress={handleTrailer}
             activeOpacity={0.85}
           >
             <Ionicons name="play" size={18} color="#000" />
@@ -173,18 +256,14 @@ const ClipCard = React.memo(function ClipCard({ item }: { item: ClipItem }) {
             </Text>
           </TouchableOpacity>
 
-          {/* Go to detail */}
           <TouchableOpacity
             style={styles.detailBtn}
-            onPress={() => {
+            onPress={(e) => {
+              e.stopPropagation?.();
               haptic.light();
               router.push({
                 pathname: "/movie/[id]",
-                params: {
-                  id: `tmdb-${item.id}`,
-                  type: item.mediaType,
-                  title_param: item.title,
-                },
+                params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title },
               });
             }}
             activeOpacity={0.8}
@@ -195,58 +274,87 @@ const ClipCard = React.memo(function ClipCard({ item }: { item: ClipItem }) {
         </View>
       </View>
 
-      {/* YouTube player modal */}
+      {/* Full-screen YouTube trailer modal */}
       <Modal
-        visible={playing}
+        visible={showTrailerModal}
         animationType="slide"
-        onRequestClose={() => setPlaying(false)}
+        onRequestClose={() => setShowTrailerModal(false)}
         statusBarTranslucent
       >
         <View style={{ flex: 1, backgroundColor: "#000" }}>
-          <YoutubeEmbedInline videoKey={item.youtubeKey!} />
-          <Pressable style={styles.closeBtn} onPress={() => setPlaying(false)}>
+          <YoutubeEmbed videoKey={item.youtubeKey!} autoplay />
+          <Pressable
+            style={styles.closeBtn}
+            onPress={() => setShowTrailerModal(false)}
+          >
             <Ionicons name="close-circle" size={34} color="rgba(255,255,255,0.9)" />
           </Pressable>
         </View>
       </Modal>
-    </View>
+    </Pressable>
   );
 });
 
-// ─── Main Clips Screen ─────────────────────────────────────────────────────────
+// ─── Main Clips Screen ────────────────────────────────────────────────────────
+
 export default function ClipsScreen() {
   const insets = useSafeAreaInsets();
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [visibleIndex, setVisibleIndex] = useState(0);
 
   const fetchClips = useCallback(async () => {
     try {
-      // Fetch trending movies + TV shows
       const [moviesPage, tvPage] = await Promise.allSettled([
         tmdb.trendingMovies(1),
         tmdb.trendingTV(1),
       ]);
 
-      const movies = moviesPage.status === "fulfilled" ? moviesPage.value.results.slice(0, 10) : [];
-      const tvShows = tvPage.status === "fulfilled" ? tvPage.value.results.slice(0, 8) : [];
+      const movies = moviesPage.status === "fulfilled"
+        ? moviesPage.value.results.slice(0, 12)
+        : [];
+      const tvShows = tvPage.status === "fulfilled"
+        ? tvPage.value.results.slice(0, 8)
+        : [];
 
-      // Interleave movies and TV
-      const combined = [...movies.map((m: any) => ({ ...m, media_type: "movie" as const })),
-                        ...tvShows.map((t: any) => ({ ...t, media_type: "tv" as const }))]
+      const combined = [
+        ...movies.map((m: any) => ({ ...m, media_type: "movie" as const })),
+        ...tvShows.map((t: any) => ({ ...t, media_type: "tv" as const })),
+      ]
         .sort(() => Math.random() - 0.5)
-        .slice(0, 15);
+        .slice(0, 18);
 
-      // Fetch trailers in parallel (first 8)
-      const withTrailers = await Promise.all(
+      // Fetch videos per item — try cache first, then TMDB
+      const withVideos = await Promise.all(
         combined.map(async (item: any) => {
           let youtubeKey: string | null = null;
+          let videoType = "Trailer";
           try {
-            const videos = await tmdb.videos(item.media_type, item.id);
-            const trailer = (videos.results ?? []).find(
-              (v: any) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser"),
-            );
-            if (trailer) youtubeKey = trailer.key;
+            const mt: "movie" | "tv" = item.media_type;
+            const tmdbId: number = item.id;
+
+            // Cache-first
+            let videos: VideoEntry[] | null = await getCachedVideos(tmdbId, mt);
+            if (!videos) {
+              const res = await tmdb.videos(mt, tmdbId);
+              const ytVideos = (res.results ?? []).filter(
+                (v: any) => v.site === "YouTube",
+              ) as VideoEntry[];
+              await setCachedVideos(tmdbId, mt, ytVideos);
+              videos = ytVideos;
+            }
+
+            // Priority: Trailer > Teaser > Clip
+            const pick =
+              videos.find((v) => v.type === "Trailer") ??
+              videos.find((v) => v.type === "Teaser") ??
+              videos.find((v) => v.type === "Clip");
+
+            if (pick) {
+              youtubeKey = pick.key;
+              videoType = pick.type;
+            }
           } catch {}
 
           const title = item.title ?? item.name ?? "Untitled";
@@ -256,10 +364,12 @@ export default function ClipsScreen() {
 
           return {
             id: item.id,
+            tmdbId: item.id,
             title,
             backdropUri,
             posterUri,
             youtubeKey,
+            videoType,
             overview: item.overview ?? "",
             mediaType: item.media_type,
             year,
@@ -269,8 +379,8 @@ export default function ClipsScreen() {
         }),
       );
 
-      // Filter out items with no image
-      setClips(withTrailers.filter((c) => c.backdropUri || c.posterUri));
+      // Keep only items with an image
+      setClips(withVideos.filter((c) => c.backdropUri || c.posterUri));
     } catch (e) {
       console.warn("[ClipsScreen] fetch error:", e);
     } finally {
@@ -285,6 +395,19 @@ export default function ClipsScreen() {
     setRefreshing(true);
     fetchClips();
   }, [fetchClips]);
+
+  // Track which item is fully on screen for auto-play
+  const viewabilityConfig = useRef<ViewabilityConfig>({
+    viewAreaCoveragePercentThreshold: 80,
+  }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index != null) {
+        setVisibleIndex(viewableItems[0].index);
+      }
+    },
+  ).current;
 
   if (loading) {
     return (
@@ -320,7 +443,9 @@ export default function ClipsScreen() {
       <FlatList
         data={clips}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <ClipCard item={item} />}
+        renderItem={({ item, index }) => (
+          <ClipCard item={item} isVisible={index === visibleIndex} />
+        )}
         pagingEnabled
         snapToInterval={CLIP_H}
         snapToAlignment="start"
@@ -328,7 +453,13 @@ export default function ClipsScreen() {
         showsVerticalScrollIndicator={false}
         onRefresh={onRefresh}
         refreshing={refreshing}
-        getItemLayout={(_, index) => ({ length: CLIP_H, offset: CLIP_H * index, index })}
+        getItemLayout={(_, index) => ({
+          length: CLIP_H,
+          offset: CLIP_H * index,
+          index,
+        })}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         windowSize={3}
         maxToRenderPerBatch={2}
         initialNumToRender={2}
@@ -336,6 +467,8 @@ export default function ClipsScreen() {
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
@@ -369,8 +502,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 14,
   },
-
-  // Header
   header: {
     position: "absolute",
     top: 0,
@@ -382,11 +513,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  headerBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 1,
-  },
+  headerBrand: { flexDirection: "row", alignItems: "center", gap: 1 },
   headerLogo: {
     color: "#E50914",
     fontSize: 22,
@@ -400,8 +527,6 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginLeft: 2,
   },
-
-  // Clip card
   card: {
     width: W,
     position: "relative",
@@ -414,9 +539,14 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 20,
     gap: 8,
+    zIndex: 10,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   genreChip: {
-    alignSelf: "flex-start",
     backgroundColor: "rgba(229,9,20,0.85)",
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -425,6 +555,17 @@ const styles = StyleSheet.create({
   genreText: {
     color: "#fff",
     fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    color: "#fff",
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -437,11 +578,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   metaText: {
     color: "rgba(255,255,255,0.75)",
     fontSize: 12,

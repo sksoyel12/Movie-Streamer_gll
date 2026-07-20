@@ -226,10 +226,25 @@ function isBanned(m: { id: number; title?: string; name?: string }): boolean {
   return false;
 }
 
+function isUnreleased(m: TMDBPage["results"][number]): boolean {
+  const dateStr = m.release_date ?? (m as any).first_air_date;
+  if (!dateStr || dateStr.length < 4) return false;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return d > today;
+  } catch { return false; }
+}
+
 function mapResults(results: TMDBPage["results"]): CardItem[] {
   return results
     .filter((m) => {
       if (isBanned(m)) return false;
+      // Hide unreleased / Coming Soon titles from home rows
+      if (isUnreleased(m)) return false;
       // Must have at least one image
       if (!(m.poster_path || m.backdrop_path)) {
         if (__DEV__) {

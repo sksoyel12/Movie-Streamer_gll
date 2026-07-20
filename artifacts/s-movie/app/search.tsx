@@ -63,6 +63,7 @@ interface SearchResult {
   rating: number;
   mediaType: "movie" | "tv";
   genres: string[];
+  releaseDate?: string | null; // ISO date string — used for "Coming Soon" badge
 }
 
 // ─── Search history hook ───────────────────────────────────────────────────────
@@ -119,10 +120,12 @@ function staticFallback(q: string, filter: Filter): SearchResult[] {
       id: m.id,
       title: m.title,
       poster: m.poster as { uri: string } | null,
+      backdrop: null,
       year: m.year,
       rating: (m as any).tmdbRating ?? 0,
       mediaType: ((m as any).mediaType ?? "movie") as "movie" | "tv",
       genres: m.genres,
+      releaseDate: null,
     }));
 }
 
@@ -133,11 +136,25 @@ function tmdbResultToItem(m: TMDBMovie): SearchResult {
     tmdbId: card.tmdbId,
     title: card.title,
     poster: card.poster,
+    backdrop: card.hero ?? null,
     year: card.year,
     rating: card.tmdbRating,
     mediaType: card.mediaType,
     genres: card.genres,
+    releaseDate: (m as any).release_date ?? (m as any).first_air_date ?? null,
   };
+}
+
+function isComingSoonDate(dateStr?: string | null): boolean {
+  if (!dateStr || dateStr.length < 4) return false;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return d > today;
+  } catch { return false; }
 }
 
 // ─── Trending hook ─────────────────────────────────────────────────────────────
@@ -280,6 +297,7 @@ export default function SearchScreen() {
   // ── Grid card ────────────────────────────────────────────────────────────────
   const renderGridItem = ({ item, index }: { item: SearchResult; index: number }) => {
     const isLast = (index + 1) % NUM_COLUMNS === 0;
+    const comingSoon = isComingSoonDate(item.releaseDate);
     return (
       <Pressable
         onPress={() => onPressResult(item)}
@@ -292,7 +310,7 @@ export default function SearchScreen() {
         {item.poster?.uri ? (
           <SmartImage
             source={{ uri: item.poster.uri.replace(/\/w\d+\//, "/w500/") }}
-            style={styles.gridPoster}
+            style={[styles.gridPoster, comingSoon && { opacity: 0.55 }]}
             contentFit="cover"
             transition={300}
             cachePolicy="memory-disk"
@@ -306,6 +324,17 @@ export default function SearchScreen() {
           colors={["transparent", "rgba(0,0,0,0.88)"]}
           style={styles.gridGradient}
         />
+
+        {/* Coming Soon overlay */}
+        {comingSoon && (
+          <View style={styles.comingSoonOverlay}>
+            <View style={styles.comingSoonBadge}>
+              <Ionicons name="time-outline" size={10} color="#fff" />
+              <Text style={styles.comingSoonText}>COMING SOON</Text>
+            </View>
+          </View>
+        )}
+
         <View style={[styles.typeBadge, item.mediaType === "tv" ? styles.typeBadgeTV : styles.typeBadgeMovie]}>
           <Text style={styles.typeBadgeText}>{item.mediaType === "tv" ? "TV" : "MV"}</Text>
         </View>
@@ -313,7 +342,7 @@ export default function SearchScreen() {
           <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
           <View style={styles.gridMeta}>
             <Text style={styles.gridYear}>{item.year}</Text>
-            {item.rating > 0 && (
+            {item.rating > 0 && !comingSoon && (
               <View style={styles.gridRatingBadge}>
                 <Text style={styles.gridRatingText}>{item.rating.toFixed(1)}</Text>
               </View>
@@ -759,6 +788,32 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   gridRatingText: { color: "#f5c518", fontSize: 9, fontFamily: "Inter_600SemiBold" },
+
+  // ── Coming Soon overlay
+  comingSoonOverlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 5,
+  },
+  comingSoonBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  comingSoonText: {
+    color: "#fff",
+    fontSize: 8,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+  },
 
   // ── Empty state sections
   section: { marginTop: 20 },
