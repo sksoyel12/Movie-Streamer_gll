@@ -4,6 +4,7 @@
 - [TMDB consolidation](tmdb-consolidation.md) — all TMDB API calls must go through lib/tmdb.ts; never add a new TMDB_KEY constant or direct fetch in any other file
 - [Promotional poster filter](promotional-poster-filter.md) — fetchMoviePosters must use vote_average ≥ 4 as Tier 1; vote_count>0 as Tier 2; raw as Tier 3 — promo posters score 0–3
 - [MovieRow flash bug](movierow-flash-bug.md) — inline tmdbFetcher arrow functions cause re-fetch on every parent render; fixed with fetcher refs
+- [MovieRow hooks violation](movierow-hooks-violation.md) — useMemo after early-return guards = "fewer hooks than expected"; all hooks must precede ALL early returns
 - [Hero poster enrichment](hero-poster-enrichment.md) — toMovieCard must forward tmdbId+mediaType or enrichment silently fails; fetchHero must call setHeroMovies only once (after enrichment)
 - [Hindi trailer system](hindi-trailer-system.md) — lib/hindi-trailer.ts is the single source of truth for trailer selection; use pickHindiFromVideos() for sync TMDB picks, fetchHindiTrailer() for async fetch+cache
 - [S-Movie content freshness system](smovie-content-freshness.md) — daily rotation helpers, popularity-weighted shuffle, and a Movie-type `popularity` field gotcha for generic sort/shuffle utils

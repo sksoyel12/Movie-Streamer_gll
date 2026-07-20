@@ -749,6 +749,21 @@ export default function MovieRow({
     [],
   );
 
+  // ── Global image guard: never render a card with no valid image URI ─────────
+  // Must come BEFORE any early returns so the hook call count is consistent
+  // across all renders — a useMemo after a conditional return violates the
+  // Rules of Hooks and produces "Rendered fewer hooks than expected".
+  const visibleMovies = React.useMemo(
+    () => movies.filter((m) => {
+      const uri = resolveImageUri(m, activeGenre, imageMode);
+      if (uri) return true;
+      // Fallback: accept if the card at least has a stored poster URI
+      const stored = (m.poster as { uri?: string })?.uri;
+      return Boolean(stored);
+    }),
+    [movies, activeGenre, imageMode],
+  );
+
   // Collapse only when loading finished with no data AND we have never
   // successfully loaded — i.e. the row is genuinely unavailable, not just
   // failing due to a transient network error.
@@ -766,20 +781,6 @@ export default function MovieRow({
       </View>
     );
   }
-
-  // ── Global image guard: never render a card with no valid image URI ─────────
-  // Filters items AFTER fetching/caching so blank "No image" boxes never appear,
-  // regardless of which API endpoint, category, or cache layer produced the data.
-  const visibleMovies = React.useMemo(
-    () => movies.filter((m) => {
-      const uri = resolveImageUri(m, activeGenre, imageMode);
-      if (uri) return true;
-      // Fallback: accept if the card at least has a stored poster URI
-      const stored = (m.poster as { uri?: string })?.uri;
-      return Boolean(stored);
-    }),
-    [movies, activeGenre, imageMode],
-  );
 
   return (
     <View style={styles.wrap}>
