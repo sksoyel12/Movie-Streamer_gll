@@ -11,6 +11,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -42,11 +43,48 @@ interface ClipItem {
 }
 
 // ─── YouTube embed inline ──────────────────────────────────────────────────────
+// On web: render a plain <iframe> (react-native-webview is not available on web).
+// On native: lazily load react-native-webview via a safe try/require — any error
+// (e.g. running in Expo Go without the native module) falls back to the web path.
 function YoutubeEmbedInline({ videoKey }: { videoKey: string }) {
-  const WebView = require("react-native-webview").WebView;
-  const html = `<!DOCTYPE html><html><head><style>*{margin:0;padding:0}body{background:#000}</style></head><body><iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoKey}?autoplay=1&rel=0&controls=1&modestbranding=1" frameborder="0" allowfullscreen allow="autoplay"></iframe></body></html>`;
+  const embedUrl = `https://www.youtube.com/embed/${videoKey}?autoplay=1&rel=0&controls=1&modestbranding=1`;
+
+  if (Platform.OS === "web") {
+    // On web, use a standard iframe — no native module needed.
+    return (
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
+        <iframe
+          src={embedUrl}
+          style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#000" } as any}
+          allow="autoplay; fullscreen"
+          allowFullScreen
+        />
+      </View>
+    );
+  }
+
+  // Native: use react-native-webview safely
+  let NativeWebView: React.ComponentType<any> | null = null;
+  try {
+    NativeWebView = require("react-native-webview").WebView;
+  } catch {
+    NativeWebView = null;
+  }
+
+  if (!NativeWebView) {
+    // Fallback: open in external browser when module unavailable
+    return (
+      <View style={{ flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "#fff", fontSize: 14, textAlign: "center", paddingHorizontal: 32 }}>
+          Trailer player unavailable.{"\n"}Tap outside to close.
+        </Text>
+      </View>
+    );
+  }
+
+  const html = `<!DOCTYPE html><html><head><style>*{margin:0;padding:0}body{background:#000}</style></head><body><iframe width="100%" height="100%" src="${embedUrl}" frameborder="0" allowfullscreen allow="autoplay"></iframe></body></html>`;
   return (
-    <WebView
+    <NativeWebView
       source={{ html }}
       style={{ flex: 1, backgroundColor: "#000" }}
       allowsInlineMediaPlayback

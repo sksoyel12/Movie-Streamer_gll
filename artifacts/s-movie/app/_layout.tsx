@@ -406,11 +406,15 @@ export default function RootLayout() {
     DancingScript_700Bold,
   });
 
-  // Hide the native splash immediately on first mount so the white
-  // framework placeholder never flashes — our black UI renders first.
+  // Hide the native splash only after fonts are determined (loaded OR errored).
+  // Calling hideAsync() before fonts are ready caused the native splash to
+  // disappear prematurely and reveal a black screen mid-load. With this
+  // pattern the native splash stays visible until the real UI is ready,
+  // producing a smooth, single transition with no intermediate black flash.
   useEffect(() => {
+    if (!fontsLoaded && !fontError) return;
     SplashScreen.hideAsync().catch(() => {});
-  }, []);
+  }, [fontsLoaded, fontError]);
 
   const [forceUpdateInfo, setForceUpdateInfo] = useState<VersionInfo | null>(null);
   const [showForceUpdate, setShowForceUpdate] = useState(false);
