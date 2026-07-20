@@ -22,6 +22,11 @@
  *   1anime.app, yenime.net, animepahe.pw, kaa.lt, kickassanime.cx,
  *   fanime.tv, justanime.to, anikage.cc, enma.lol, anime.nexus,
  *   anistream.one, animetsu.bz, voidanime.tech
+ * v7.0 additions (125-source catalog):
+ *   vidsrc.to, vidsrc.me, vidsrc.xyz, themoviebox.org, multiembed.mov,
+ *   autoembed.co, flickystream.su — added to embed race pool.
+ *   embed.su, moviesapi.club, 2embed.cc — already in pool, now in catalog too.
+ *   vegamovies.navy, hdhub4u, sonyliv, viki — scraper/portal entries.
  * Note: vegamovies, fzmovies, manga sites, live-TV/sports sites excluded —
  *   these are download/reading/live sites with no TMDB-based embed API.
  *
@@ -415,6 +420,49 @@ const EMBED_SOURCES: EmbedDef[] = [
     source: "voidanime.tech",
     movie: (id) => `https://www.voidanime.tech/embed/movie/${id}`,
     tv: (id, s, e) => `https://www.voidanime.tech/embed/tv/${id}/${s}/${e}`,
+  },
+
+  // ─── v7.0 — new sources from user list ────────────────────────────────────
+
+  // ★ VidSrc family — extremely popular TMDB-native embed pool
+  {
+    source: "vidsrc.to",
+    movie: (id) => `https://vidsrc.to/embed/movie/${id}`,
+    tv: (id, s, e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}`,
+  },
+  {
+    source: "vidsrc.me",
+    movie: (id) => `https://vidsrc.me/embed/movie?tmdb=${id}`,
+    tv: (id, s, e) => `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}`,
+  },
+  {
+    source: "vidsrc.xyz",
+    movie: (id) => `https://vidsrc.xyz/embed/movie/${id}`,
+    tv: (id, s, e) => `https://vidsrc.xyz/embed/tv/${id}/${s}/${e}`,
+  },
+  // TheMovieBox
+  {
+    source: "themoviebox.org",
+    movie: (id) => `https://themoviebox.org/embed/movie/${id}`,
+    tv: (id, s, e) => `https://themoviebox.org/embed/tv/${id}/${s}/${e}`,
+  },
+  // MultiEmbed — multi-server aggregator with direct PHP endpoint
+  {
+    source: "multiembed.mov",
+    movie: (id) => `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1`,
+    tv: (id, s, e) => `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
+  },
+  // AutoEmbed.co (separate from autoembed.cc)
+  {
+    source: "autoembed.co",
+    movie: (id) => `https://autoembed.co/movie/tmdb/${id}`,
+    tv: (id, s, e) => `https://autoembed.co/tv/tmdb/${id}-${s}-${e}`,
+  },
+  // FlickyStream SU mirror
+  {
+    source: "flickystream.su",
+    movie: (id) => `https://flickystream.su/embed/movie/${id}`,
+    tv: (id, s, e) => `https://flickystream.su/embed/tv/${id}/${s}/${e}`,
   },
 ];
 
