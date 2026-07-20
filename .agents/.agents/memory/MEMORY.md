@@ -1,0 +1,16 @@
+- [59-category home screen](home-59-categories.md) — all 59 rows permanently set in lib/categoryMap.ts; hero banner is above them in index.tsx
+- [New TMDB fetchers](new-tmdb-fetchers.md) — becauseYouLiked, becauseYouWatched, dreamsToYou, onlyOnNetflix, actionAdventureMovies, top5NetflixKorean added to lib/tmdb.ts
+- [Security stack](security-stack.md) — 6-layer API security in artifacts/api-server/src/middleware/
+- [TMDB consolidation](tmdb-consolidation.md) — all TMDB calls go through lib/tmdb.ts, never direct
+- [API security layers](api-security-layers.md) — JWT + encryption details for the API
+- [Express5 wildcard](express5-wildcard.md) — Express 5 wildcard route syntax change
+- [Firebase Google signin branding](firebase-google-signin-branding.md) — branding notes
+- [Hero poster enrichment](hero-poster-enrichment.md) — multi-asset rotation for hero posters
+- [Hindi trailer system](hindi-trailer-system.md) — Hindi trailer selection logic
+- [MovieRow flash bug](movierow-flash-bug.md) — flash/flicker fix for MovieRow
+- [MovieRow hooks violation](movierow-hooks-violation.md) — React hooks rules fix in MovieRow
+- [Nav crash root cause](nav-crash-root-cause.md) — navigation crash root cause and fix
+- [S-Movie 6-module overhaul](smovie-6module-overhaul.md) — navigation and UI updates
+- [S-Movie content freshness](smovie-content-freshness.md) — content freshness strategy
+- [S-Movie deps install](smovie-deps-install.md) — dependency installation notes
+- [TMDB auth](tmdb-auth.md) — TMDB authentication details
