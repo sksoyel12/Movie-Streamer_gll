@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Svg, { Text as SvgText } from "react-native-svg";
 
 import type { Movie } from "@/data/movies";
 import { haptic } from "@/lib/haptics";
@@ -75,19 +76,49 @@ function mapResults(results: TMDBPage["results"]): Movie[] {
   );
 }
 
-// ── Netflix-style Rank Number ─────────────────────────────────────────────────
-// Large bold number that sits behind the poster — exactly like Netflix Top 10.
+// ── Netflix-style Rank Number — SVG outline approach ─────────────────────────
+// True transparent-fill + thick-stroke outline, exactly like Netflix Top 10.
+// react-native-svg gives us real text stroke which React Native Text cannot do.
 function RankNumber({ rank }: { rank: number }) {
+  const label  = String(rank);
+  const isDouble = label.length > 1;               // "10" needs smaller font
+  const fontSize   = isDouble ? 108 : RANK_FONT;   // shrink for "10"
+  const strokeW    = isDouble ? 7   : 9;            // slightly thinner stroke on "10"
+  // Anchor text at bottom of SVG so all numbers sit on the same baseline
+  const textY = CARD_H - 6;
+
   return (
     <View style={s.rankOuter} pointerEvents="none">
-      <Text
-        style={s.rankText}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        allowFontScaling={false}
-      >
-        {String(rank)}
-      </Text>
+      <Svg width={BADGE_W} height={CARD_H}>
+        {/* Dark shadow layer — gives depth like Netflix */}
+        <SvgText
+          x={BADGE_W / 2 + 3}
+          y={textY + 4}
+          textAnchor="middle"
+          fontSize={fontSize}
+          fontWeight="900"
+          fill="none"
+          stroke="rgba(0,0,0,0.55)"
+          strokeWidth={strokeW + 4}
+          strokeLinejoin="round"
+        >
+          {label}
+        </SvgText>
+        {/* Main outline — transparent fill, white/light-grey stroke */}
+        <SvgText
+          x={BADGE_W / 2}
+          y={textY}
+          textAnchor="middle"
+          fontSize={fontSize}
+          fontWeight="900"
+          fill="transparent"
+          stroke="rgba(220,220,220,0.92)"
+          strokeWidth={strokeW}
+          strokeLinejoin="round"
+        >
+          {label}
+        </SvgText>
+      </Svg>
     </View>
   );
 }
