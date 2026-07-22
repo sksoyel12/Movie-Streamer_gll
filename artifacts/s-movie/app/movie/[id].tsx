@@ -926,7 +926,7 @@ export default function MovieDetail() {
 
     // Data is still loading — show the nav-param poster immediately (no blank screen).
     // If no poster was passed, show a centred spinner so the screen is never pure black.
-    const instantHeroH = Math.round(SCREEN_W * (9 / 16));
+    const instantHeroH = Math.round(SCREEN_H * 0.38);
 
     // Shared loading body — title + Play + Download visible immediately
     const loadingBody = (
@@ -1000,10 +1000,10 @@ export default function MovieDetail() {
               transition={200}
               cachePolicy="memory-disk"
             />
-            {/* Gradient: poster visible at top, fades to black at bottom */}
+            {/* Gradient: strong top shadow for back button + fade to black at bottom */}
             <LinearGradient
-              colors={["rgba(0,0,0,0.10)", "rgba(0,0,0,0.45)", "#000"]}
-              locations={[0, 0.6, 1]}
+              colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.72)", "#000"]}
+              locations={[0, 0.40, 0.80, 1]}
               style={StyleSheet.absoluteFill}
             />
             <Pressable
@@ -1021,8 +1021,8 @@ export default function MovieDetail() {
     );
   }
 
-  // ~22% taller than standard 16:9 — cinematic OTT banner height
-  const heroHeight = Math.round(SCREEN_W * (9 / 16) * 1.22);
+  // Portrait poster hero — 38% of screen height, Netflix detail style
+  const heroHeight = Math.round(SCREEN_H * 0.38);
   const seasonList = hasTmdbSeasonMeta
     ? tmdbSeasonMeta.map((season) => season.name || `Season ${season.season_number}`)
     : buildSeasons(seasonNumbers.length);
@@ -1043,22 +1043,22 @@ export default function MovieDetail() {
         contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Hero — landscape 16:9 backdrop, Netflix detail style ──── */}
+        {/* ── Hero — portrait poster, Netflix detail style (35-40% of screen) ──── */}
         <View style={[styles.hero, { height: heroHeight }]}>
 
-          {/* Backdrop (wide landscape key art) — ONLY TMDB backdrop, never portrait poster */}
+          {/* Portrait poster — the primary key art, full bleed */}
           <SmartImage
-            source={(movie?.hero ?? require("@/assets/images/hero.png")) as any}
+            source={(movie?.poster ?? require("@/assets/images/hero.png")) as any}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={200}
             cachePolicy="memory-disk"
           />
 
-          {/* Gradient: cinematic — soft dark top edges + strong black fade at bottom */}
+          {/* Gradient: strong top shadow to keep back button readable, fades to black at bottom */}
           <LinearGradient
-            colors={["rgba(0,0,0,0.38)", "transparent", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.68)", "#000"]}
-            locations={[0, 0.18, 0.52, 0.80, 1]}
+            colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.72)", "#000"]}
+            locations={[0, 0.12, 0.50, 0.82, 1]}
             style={StyleSheet.absoluteFill}
           />
 
@@ -1837,11 +1837,11 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
   },
 
-  // ── Body — seamless, no card rounding, pure Netflix black ────────────────
+  // ── Body — seamless, no gap from poster, pure Netflix black ──────────────
   body: {
     backgroundColor: "#000000",
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 6,
   },
 
   // Kept in sheet for backward compat but never rendered in main flow

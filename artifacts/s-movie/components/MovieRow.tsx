@@ -49,10 +49,11 @@ const ITEM_STRIDE = CARD_W + CARD_GAP;
 
 
 // ─── Content badge helpers ─────────────────────────────────────────────────────
-// Priority order: NEW EPISODE > NEW SEASON > TRENDING
-// Only ONE badge per poster. TOP 10 overrides all (handled separately, top-right).
-const SEVEN_DAYS_MS  = 7  * 24 * 60 * 60 * 1000;
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+// Priority order: NEW EPISODE > NEW SEASON > RECENTLY ADDED > TRENDING
+// Only ONE bottom badge per poster. TOP 10 is separate (top-right corner).
+const SEVEN_DAYS_MS    = 7  * 24 * 60 * 60 * 1000;
+const THIRTEEN_DAYS_MS = 13 * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS   = 30 * 24 * 60 * 60 * 1000;
 
 function getFreshBadge(m: any): "NEW EPISODE" | null {
   const now = Date.now();
@@ -65,10 +66,10 @@ function getFreshBadge(m: any): "NEW EPISODE" | null {
 
 /**
  * Returns the single highest-priority ribbon badge label for a card.
- * Red ribbon placed at bottom-left of the poster (spec: #E50914, 6-8px radius,
- * 6px H / 3px V padding, white bold text).
+ * Red bar placed at the bottom edge of the poster (centered, full-width).
+ * Priority: NEW EPISODE > NEW SEASON > RECENTLY ADDED > TRENDING
  */
-function getContentBadge(m: any): "NEW EPISODE" | "NEW SEASON" | "TRENDING" | null {
+function getContentBadge(m: any): "NEW EPISODE" | "NEW SEASON" | "RECENTLY ADDED" | "TRENDING" | null {
   const now = Date.now();
   // 1. NEW EPISODE — last_air_date within 7 days
   if (m.last_air_date) {
@@ -80,7 +81,13 @@ function getContentBadge(m: any): "NEW EPISODE" | "NEW SEASON" | "TRENDING" | nu
     const d = new Date(m.first_air_date).getTime();
     if (!isNaN(d) && now - d <= THIRTY_DAYS_MS && d <= now) return "NEW SEASON";
   }
-  // 3. TRENDING — popularity above threshold (TMDB's score, typically 100+ = trending)
+  // 3. RECENTLY ADDED — release_date or first_air_date within last 13 days
+  const recentDate = m.release_date ?? m.first_air_date;
+  if (recentDate) {
+    const d = new Date(recentDate).getTime();
+    if (!isNaN(d) && now - d <= THIRTEEN_DAYS_MS && d <= now) return "RECENTLY ADDED";
+  }
+  // 4. TRENDING — popularity above threshold (TMDB's score, typically 100+ = trending)
   if ((m.popularity ?? 0) > 150) return "TRENDING";
   return null;
 }
@@ -976,28 +983,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Red ribbon badge — bottom-left corner (Module 4 spec) ────────────────────
-  // #E50914 red, white bold text, 6-8px rounded corners, 6px H / 3px V padding,
-  // small shadow, ONE badge per poster.
+  // ── Red ribbon badge — bottom-center edge (Netflix spec) ─────────────────
+  // Full-width #E50914 red bar at the bottom edge of the poster,
+  // centered white bold text. ONE badge per poster.
   ribbonBadge: {
-    position:          "absolute",
-    bottom:             6,
-    left:               6,
-    backgroundColor:   "#E50914",
-    paddingHorizontal:  6,
-    paddingVertical:    3,
-    borderRadius:       7,
-    zIndex:             10,
-    shadowColor:        "#000",
-    shadowOffset:       { width: 0, height: 2 },
-    shadowOpacity:      0.45,
-    shadowRadius:       3,
-    elevation:          5,
+    position:        "absolute",
+    bottom:          0,
+    left:            0,
+    right:           0,
+    backgroundColor: "#E50914",
+    paddingVertical: 4,
+    alignItems:      "center" as const,
+    justifyContent:  "center" as const,
+    zIndex:          10,
+    shadowColor:     "#000",
+    shadowOffset:    { width: 0, height: -1 },
+    shadowOpacity:   0.35,
+    shadowRadius:    3,
+    elevation:       5,
   },
   ribbonBadgeText: {
     color:         "#fff",
     fontFamily:    "Inter_700Bold",
     fontSize:      8,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
 });
