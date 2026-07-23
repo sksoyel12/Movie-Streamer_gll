@@ -38,6 +38,7 @@ import { MyListProvider } from "@/contexts/MyListContext";
 import { DownloadProvider } from "@/contexts/DownloadContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 import { CURRENT_VERSION } from "@/data/releaseNotes";
 import {
   attachNotificationListeners,
@@ -522,6 +523,7 @@ export default function RootLayout() {
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000" }}>
               <KeyboardProvider>
                 <MyListProvider>
+                  <UserPreferencesProvider>
                   <DownloadProvider>
                     <StatusBar style="light" translucent backgroundColor="transparent" />
                     <RootLayoutNav />
@@ -551,6 +553,7 @@ export default function RootLayout() {
                       onDismiss={() => setSuspension(null)}
                     />
                   </DownloadProvider>
+                  </UserPreferencesProvider>
                 </MyListProvider>
               </KeyboardProvider>
             </GestureHandlerRootView>

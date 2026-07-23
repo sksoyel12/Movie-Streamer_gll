@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -30,6 +30,7 @@ import { hasUnread as checkHasUnread } from "@/lib/notificationPrefs";
 import { saveHomeCacheTTL, loadHomeCacheTTL, loadHomeCache, HERO_CACHE_KEY } from "@/lib/homeCache";
 import { LATEST_NOTIF_AT } from "@/data/notifications";
 import { getDailyGradient } from "@/lib/dailyGradient";
+import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 
 // Stagger row fetches so we don't fire ~50 TMDB requests in the same tick.
 const ROW_LOAD_STAGGER_MS = 120;
@@ -87,6 +88,21 @@ export default function HomeScreen() {
   // below the hero to re-fetch from TMDB and re-shuffle its display order
   // (weighted by popularity) — triggered on pull-to-refresh.
   const [rowRefreshKey, setRowRefreshKey]   = useState(0);
+
+  // ── AI Personalization — loads silently in background, never blocks render ──
+  const {
+    topGenres,
+    personalImageMode,
+    personalRowTitle,
+    ready: prefsReady,
+  } = useUserPreferences();
+
+  // Personalised fetcher — rebuilds only when topGenres changes (memoised).
+  // Falls back to weekly trending until user has enough watch data.
+  const personalFetcher = useMemo(
+    () => tmdb.personalizedByGenres(topGenres, "tv"),
+    [topGenres.join(",")], // stable key so MovieRow doesn't remount needlessly
+  );
 
   const scrollY      = useRef(new Animated.Value(0)).current;
   const heroRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -272,44 +288,72 @@ export default function HomeScreen() {
         {/* ── Hero Banner — untouched ── */}
         <StableHero movies={heroMovies} refreshing={refreshing} />
 
-        {/* ── Category rows — driven by lib/categoryMap.ts (55-item order) ── */}
+        {/* ── Category rows — driven by lib/categoryMap.ts ── */}
         {HOME_CATEGORIES.map((cat, index) => {
           const loadDelay = index * ROW_LOAD_STAGGER_MS;
 
+          // ── Personalised "Top Picks For You" row — injected after
+          // "Because you liked" (index 8) once prefs are ready ──────────────
+          const personalRow = (index === 8 && prefsReady) ? (
+            <MovieRow
+              key="__topPicksForYou__"
+              title={personalRowTitle}
+              movies={[]}
+              tmdbFetcher={personalFetcher}
+              loadDelay={loadDelay + ROW_LOAD_STAGGER_MS}
+              seenIds={seenIds}
+              refreshKey={rowRefreshKey}
+              imageMode={personalImageMode}
+            />
+          ) : null;
+
           if (cat.kind === "special") {
-            switch (cat.key) {
-              case "continueWatching":
-                return <ContinueWatchingRow key={cat.key} />;
-              case "myList":
-                return <MyListRow key={cat.key} />;
-              default:
-                return null;
-            }
+            const specialEl = (() => {
+              switch (cat.key) {
+                case "continueWatching":
+                  return <ContinueWatchingRow key={cat.key} />;
+                case "myList":
+                  return <MyListRow key={cat.key} />;
+                default:
+                  return null;
+              }
+            })();
+            return (
+              <React.Fragment key={cat.key}>
+                {personalRow}
+                {specialEl}
+              </React.Fragment>
+            );
           }
 
           if (cat.kind === "top10") {
             return (
-              <Top10Row
-                key={cat.title}
-                title={cat.title}
-                movies={[]}
-                tmdbFetcher={cat.fetcher}
-                loadDelay={loadDelay}
-                refreshKey={rowRefreshKey}
-              />
+              <React.Fragment key={cat.title}>
+                {personalRow}
+                <Top10Row
+                  title={cat.title}
+                  movies={[]}
+                  tmdbFetcher={cat.fetcher}
+                  loadDelay={loadDelay}
+                  refreshKey={rowRefreshKey}
+                />
+              </React.Fragment>
             );
           }
 
           return (
-            <MovieRow
-              key={cat.title}
-              title={cat.title}
-              movies={[]}
-              tmdbFetcher={cat.fetcher}
-              loadDelay={loadDelay}
-              seenIds={seenIds}
-              refreshKey={rowRefreshKey}
-            />
+            <React.Fragment key={cat.title}>
+              {personalRow}
+              <MovieRow
+                title={cat.title}
+                movies={[]}
+                tmdbFetcher={cat.fetcher}
+                loadDelay={loadDelay}
+                seenIds={seenIds}
+                refreshKey={rowRefreshKey}
+                imageMode={cat.imageMode}
+              />
+            </React.Fragment>
           );
         })}
 

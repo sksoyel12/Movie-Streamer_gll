@@ -1412,6 +1412,49 @@ export const tmdb = {
     }),
 
   /**
+   * Only On S-Movie Original — prestige titles curated exclusively for this
+   * platform: high-rated, recent, award-quality films that feel "originals-tier".
+   */
+  onlyOnSMovie: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/movie", {
+      sort_by: "vote_average.desc",
+      "vote_average.gte": 7.8,
+      "vote_count.gte": 500,
+      "primary_release_date.gte": `${new Date().getFullYear() - 4}-01-01`,
+      "primary_release_date.lte": TODAY,
+      page,
+    }),
+
+  /**
+   * Personalised fetcher — returns content matching the user's top genre IDs.
+   * Call as: tmdb.personalizedByGenres([10749, 18], "tv")(page)
+   * Used by the "Top Picks For You" / "Your [Genre] Picks" row.
+   */
+  personalizedByGenres: (
+    genreIds:  number[],
+    mediaType: "movie" | "tv" = "movie",
+  ) => (page = 1): Promise<TMDBPage> => {
+    if (genreIds.length === 0) {
+      // Cold start — fall back to weekly trending
+      return mediaType === "tv"
+        ? get<TMDBPage>("/trending/tv/week", { page })
+        : get<TMDBPage>("/trending/movie/week", { page });
+    }
+    const endpoint = mediaType === "tv" ? "/discover/tv" : "/discover/movie";
+    const genreStr = genreIds.slice(0, 3).join("|"); // OR logic — any matching genre
+    const dateKey  = mediaType === "tv" ? "first_air_date.lte" : "primary_release_date.lte";
+    const params: Record<string, string | number> = {
+      with_genres:        genreStr,
+      sort_by:            "vote_average.desc",
+      "vote_average.gte": 7.0,
+      "vote_count.gte":   50,
+      page,
+    };
+    params[dateKey] = TODAY;
+    return get<TMDBPage>(endpoint, params);
+  },
+
+  /**
    * TMDB curated list by list ID — /3/list/{id}
    * Wraps the list response into the standard TMDBPage shape.
    */

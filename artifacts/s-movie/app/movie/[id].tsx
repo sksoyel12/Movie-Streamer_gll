@@ -50,6 +50,7 @@ import { pickHindiFromVideos } from "@/lib/hindi-trailer";
 import { searchHindiTrailer, searchYouTubeTrailer } from "@/lib/youtube";
 import { loadProgress } from "@/lib/watchProgress";
 import { addToWatchHistory } from "@/lib/watchHistory";
+import { trackContentView } from "@/lib/userPreferences";
 import { STREAM_SOURCES } from "../../src/utils/streamConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchMovieLinks, type MovieLinks } from "@/lib/movieLinks";
@@ -464,7 +465,7 @@ export default function MovieDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numericTmdbId, staticMovie, dynamicRetryKey]);
 
-  // Save to watch history whenever we have a valid movie
+  // Save to watch history + track genre preference whenever we have a valid movie
   useEffect(() => {
     if (!movie) return;
     const posterUri = (() => {
@@ -474,7 +475,14 @@ export default function MovieDetail() {
     })();
     if (!movie.id || !movie.title) return;
     addToWatchHistory({ id: movie.id, title: movie.title, posterUri }).catch(() => {});
-  }, [movie?.id]);
+    // Silent background genre tracking — fire-and-forget, never awaited
+    // Prefer numeric genre IDs from tmdbDetail; fall back to nothing (waits for next render)
+    const genreIds = (tmdbDetail?.genres ?? []).map((g: { id: number }) => g.id);
+    if (genreIds.length > 0) {
+      trackContentView(movie.id, genreIds).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movie?.id, tmdbDetail?.id]);
 
   // Load persisted user rating from AsyncStorage on mount / id change
   useEffect(() => {

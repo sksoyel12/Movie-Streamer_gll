@@ -1,5 +1,4 @@
 import { router } from "expo-router";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -22,15 +21,25 @@ import { Skeleton } from "@/components/Skeleton";
 import SmartImage from "@/components/SmartImage";
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const CARD_W          = 134;             // poster width
-const CARD_H          = 200;             // poster height  (≈ 2:3)
-const BADGE_W         = 86;             // glass badge total width
-const POSTER_OFFSET   = 52;             // px of badge visible left of poster
-const ITEM_GAP        = 10;
-const ITEM_W          = POSTER_OFFSET + CARD_W;
-const ITEM_STRIDE     = ITEM_W + ITEM_GAP;
-const RANK_FONT       = 152;
-const RANK_LINE       = 152;
+// Tuned to match Netflix's Top 10 exactly:
+//   • large outlined rank number on pure black
+//   • poster overlaps the right half of the number
+//   • no background panel / glassmorphism
+const CARD_W        = 140;    // poster width
+const CARD_H        = 210;    // poster height  (≈ 2:3)
+const NUM_VISIBLE   = 68;     // px of number visible left of poster edge
+const ITEM_GAP      = 2;      // tight gap like Netflix
+const ITEM_W        = NUM_VISIBLE + CARD_W;
+const ITEM_STRIDE   = ITEM_W + ITEM_GAP;
+
+// Number font sizes
+const FONT_SINGLE   = 190;    // 1-digit rank
+const FONT_DOUBLE   = 148;    // 2-digit rank
+// Number container is wider than NUM_VISIBLE so the digit can be large;
+// the poster simply overlaps the right portion.
+const NUM_BOX_W     = NUM_VISIBLE + CARD_W * 0.55;   // ~145px — big enough for any digit
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface Props {
   title:        string;
@@ -77,137 +86,106 @@ function mapResults(results: TMDBPage["results"]): Movie[] {
   );
 }
 
-// ── Glassmorphism Rank Number ─────────────────────────────────────────────────
-// Frosted-glass panel behind the poster + SVG outline number on top.
-// iOS/web → real BlurView backdrop blur (glass sheen + gradient).
-// Android  → dark semi-transparent fallback (BlurView unreliable on Android).
-function RankNumber({ rank }: { rank: number }) {
+// ── Netflix-style rank number ─────────────────────────────────────────────────
+// Pure outlined SVG number on transparent/black — no glass panel, no blur.
+// Matches Netflix: white outline, transparent fill, very subtle inner glow.
+const RankNumber = React.memo(function RankNumber({ rank }: { rank: number }) {
   const label    = String(rank);
   const isDouble = label.length > 1;
-  const fontSize = isDouble ? 108 : RANK_FONT;
-  const strokeW  = isDouble ? 7   : 9;
-  const textY    = CARD_H - 6;                     // baseline at bottom
+  const fontSize = isDouble ? FONT_DOUBLE : FONT_SINGLE;
+  const strokeW  = isDouble ? 5 : 6.5;
 
-  // SVG — three layers for the glassmorphism number effect
-  const svgNumber = (
+  // Vertical center: baseline = height * 0.82 gives the visual center for
+  // both single and double-digit numbers with this font weight.
+  const textY    = CARD_H * 0.84;
+  const textX    = NUM_BOX_W * 0.44;   // shift left so poster covers right half
+
+  return (
     <Svg
-      width={BADGE_W}
+      width={NUM_BOX_W}
       height={CARD_H}
       style={StyleSheet.absoluteFillObject as any}
+      pointerEvents="none"
     >
-      {/* 1 — deep shadow: separates number from poster */}
+      {/* Deep drop-shadow layer — separates digit from the poster behind it */}
       <SvgText
-        x={BADGE_W / 2 + 3}
-        y={textY + 5}
+        x={textX + 3}
+        y={textY + 6}
         textAnchor="middle"
         fontSize={fontSize}
         fontWeight="900"
         fill="none"
-        stroke="rgba(0,0,0,0.70)"
-        strokeWidth={strokeW + 7}
+        stroke="rgba(0,0,0,0.85)"
+        strokeWidth={strokeW + 10}
         strokeLinejoin="round"
       >
         {label}
       </SvgText>
-      {/* 2 — main glass fill: very slight frosted-white tint */}
+
+      {/* Main outline — this is what the user sees: thin white/silver stroke, no fill */}
       <SvgText
-        x={BADGE_W / 2}
-        y={textY}
-        textAnchor="middle"
-        fontSize={fontSize}
-        fontWeight="900"
-        fill="rgba(255,255,255,0.10)"
-        stroke="rgba(230,232,240,0.95)"
-        strokeWidth={strokeW}
-        strokeLinejoin="round"
-      >
-        {label}
-      </SvgText>
-      {/* 3 — inner-highlight: thin bright ring = glass sheen */}
-      <SvgText
-        x={BADGE_W / 2}
+        x={textX}
         y={textY}
         textAnchor="middle"
         fontSize={fontSize}
         fontWeight="900"
         fill="transparent"
-        stroke="rgba(255,255,255,0.38)"
-        strokeWidth={1.8}
+        stroke="rgba(210,210,218,0.92)"
+        strokeWidth={strokeW}
+        strokeLinejoin="round"
+      >
+        {label}
+      </SvgText>
+
+      {/* Inner highlight — extra-thin bright ring = Netflix's subtle sheen */}
+      <SvgText
+        x={textX}
+        y={textY}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight="900"
+        fill="transparent"
+        stroke="rgba(255,255,255,0.22)"
+        strokeWidth={1.5}
         strokeLinejoin="round"
       >
         {label}
       </SvgText>
     </Svg>
   );
+});
 
-  if (Platform.OS === "android") {
-    return (
-      <View style={s.rankOuter} pointerEvents="none">
-        {/* Android: solid semi-transparent panel simulates glass */}
-        <View style={[StyleSheet.absoluteFillObject, s.glassAndroid]} />
-        {svgNumber}
-      </View>
-    );
-  }
-
-  return (
-    <View style={s.rankOuter} pointerEvents="none">
-      {/* Real frosted-glass blur — blurs the poster behind the badge */}
-      <BlurView
-        intensity={Platform.OS === "web" ? 18 : 26}
-        tint="dark"
-        style={StyleSheet.absoluteFillObject}
-      />
-      {/* Glass sheen: diagonal light gradient from top-left */}
-      <LinearGradient
-        colors={[
-          "rgba(255,255,255,0.16)",
-          "rgba(255,255,255,0.06)",
-          "rgba(255,255,255,0.01)",
-        ]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-      {/* Glass edge highlight — top + left border gives the "glass rim" look */}
-      <View style={s.glassBorder} pointerEvents="none" />
-      {svgNumber}
-    </View>
-  );
-}
-
-// ── Individual card item with its own press-scale animation ───────────────────
-function Top10Item({
+// ── Individual card ───────────────────────────────────────────────────────────
+const Top10Item = React.memo(function Top10Item({
   movie,
   rank,
   refreshKey,
   onPress,
 }: {
-  movie: Movie;
-  rank: number;
-  refreshKey: number;
-  onPress: () => void;
+  movie:       Movie;
+  rank:        number;
+  refreshKey:  number;
+  onPress:     () => void;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
     Animated.spring(scale, {
-      toValue: 1.05,
-      useNativeDriver: true,
-      damping: 12,
-      stiffness: 260,
-      mass: 0.8,
+      toValue:          0.96,
+      useNativeDriver:  true,
+      damping:          14,
+      stiffness:        280,
+      mass:             0.7,
     }).start();
   }, [scale]);
 
   const handlePressOut = useCallback(() => {
     Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      damping: 14,
-      stiffness: 240,
-      mass: 0.8,
+      toValue:          1,
+      useNativeDriver:  true,
+      damping:          14,
+      stiffness:        240,
+      mass:             0.7,
     }).start();
   }, [scale]);
 
@@ -218,10 +196,15 @@ function Top10Item({
       onPressOut={handlePressOut}
       style={s.item}
     >
-      {/* Netflix-style rank number — behind the poster */}
-      <RankNumber rank={rank} />
+      {/*
+        The number sits in absolute position, full width of the item.
+        Its SVG x-coordinate shifts it left so the poster covers the right half.
+      */}
+      <View style={s.numberLayer} pointerEvents="none">
+        <RankNumber rank={rank} />
+      </View>
 
-      {/* Poster — overlaps the badge from the right */}
+      {/* Poster — floats above the number via zIndex + elevation */}
       <Animated.View style={[s.posterCol, { transform: [{ scale }] }]}>
         <View style={s.posterWrap}>
           <SmartImage
@@ -229,7 +212,11 @@ function Top10Item({
               (movie as any).poster_url
                 ? { uri: (movie as any).poster_url }
                 : (movie as any).poster_path
-                ? { uri: `https://wsrv.nl/?url=https://image.tmdb.org/t/p/w342${(movie as any).poster_path}` }
+                ? {
+                    uri: `https://wsrv.nl/?url=https://image.tmdb.org/t/p/w342${
+                      (movie as any).poster_path
+                    }`,
+                  }
                 : (movie.poster as any)
             }
             style={s.poster}
@@ -237,9 +224,9 @@ function Top10Item({
             cachePolicy="memory-disk"
             recyclingKey={`${movie.id}-r${refreshKey}`}
           />
-          {/* Subtle bottom vignette */}
+          {/* Subtle bottom vignette so text/badges on poster read clearly */}
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.45)"]}
+            colors={["transparent", "rgba(0,0,0,0.38)"]}
             style={s.cardGrad}
             pointerEvents="none"
           />
@@ -247,12 +234,12 @@ function Top10Item({
       </Animated.View>
     </Pressable>
   );
-}
+});
 
 // ── Main row ─────────────────────────────────────────────────────────────────
 export default function Top10Row({
   title,
-  movies: initialMovies,
+  movies:   initialMovies,
   tmdbFetcher,
   refreshKey = 0,
   loadDelay  = 0,
@@ -278,7 +265,6 @@ export default function Top10Row({
         setMovies(cached);
         setLoading(false);
       }
-
       if (loadDelay > 0) await new Promise((r) => setTimeout(r, loadDelay));
       if (cancelled || !mountedRef.current) return;
       try {
@@ -319,8 +305,7 @@ export default function Top10Row({
     [refreshKey],
   );
 
-  const keyExtractor = useCallback((m: Movie) => String(m.id), []);
-
+  const keyExtractor  = useCallback((m: Movie) => String(m.id), []);
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
       length: ITEM_STRIDE,
@@ -338,57 +323,89 @@ export default function Top10Row({
         <View style={s.skeletonRow}>
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={s.skeletonItem}>
+              {/* Skeleton number placeholder */}
               <Skeleton
-                width={POSTER_OFFSET * 0.62}
-                height={CARD_H * 0.66}
-                borderRadius={6}
-                style={{ alignSelf: "flex-end", marginRight: -4 }}
+                width={NUM_VISIBLE - 8}
+                height={CARD_H * 0.72}
+                borderRadius={4}
+                style={{ alignSelf: "flex-end", marginRight: -4, opacity: 0.4 }}
               />
-              <Skeleton width={CARD_W} height={CARD_H} borderRadius={10} />
+              <Skeleton width={CARD_W} height={CARD_H} borderRadius={12} />
             </View>
           ))}
         </View>
       ) : (
-        <FlatList
-          data={movies ?? []}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          scrollEnabled
-          nestedScrollEnabled
-          style={{ minHeight: CARD_H + 20 }}
-          contentContainerStyle={s.list}
-          getItemLayout={getItemLayout}
-          initialNumToRender={5}
-          maxToRenderPerBatch={5}
-          windowSize={7}
-          decelerationRate="fast"
-          snapToInterval={ITEM_STRIDE}
-          snapToAlignment="start"
-          removeClippedSubviews={Platform.OS !== "web"}
-        />
+        <View style={s.listWrapper}>
+          <FlatList
+            data={movies ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled
+            nestedScrollEnabled
+            style={{ minHeight: CARD_H + 10 }}
+            contentContainerStyle={s.list}
+            getItemLayout={getItemLayout}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            windowSize={9}
+            decelerationRate={Platform.OS === "android" ? 0.985 : "fast"}
+            snapToInterval={ITEM_STRIDE}
+            snapToAlignment="start"
+            removeClippedSubviews={Platform.OS !== "web"}
+          />
+
+          {/* Left-edge fade — hides the cropped number of the first scrolled card */}
+          <LinearGradient
+            colors={["#000000", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.fadeLeft}
+            pointerEvents="none"
+          />
+          {/* Right-edge fade */}
+          <LinearGradient
+            colors={["transparent", "#000000"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.fadeRight}
+            pointerEvents="none"
+          />
+        </View>
       )}
     </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const FADE_W = 32;
+
 const s = StyleSheet.create({
-  wrap: { marginTop: 18, marginBottom: 6 },
+  wrap: {
+    marginTop:    20,
+    marginBottom: 4,
+    backgroundColor: "#000000",
+  },
 
   rowTitle: {
     color:             "#ffffff",
     fontSize:          17,
     fontFamily:        "Inter_700Bold",
     paddingHorizontal: 16,
-    marginBottom:      12,
+    marginBottom:      10,
     letterSpacing:     -0.3,
   },
 
+  // Wrapper that holds the FlatList + fade overlays
+  listWrapper: {
+    position: "relative",
+  },
+
   list: {
-    paddingHorizontal: 16,
-    alignItems:        "flex-end",
+    paddingLeft:  16,
+    paddingRight: 16,
+    alignItems:   "flex-end",
   },
 
   // ── Item ─────────────────────────────────────────────────────────────────
@@ -401,52 +418,32 @@ const s = StyleSheet.create({
     height:        CARD_H,
   },
 
-  // ── Glassmorphism rank number ─────────────────────────────────────────────
-  // Anchored bottom-left, sits behind the poster (lower zIndex).
-  // overflow:hidden clips the blur + gradient exactly to the badge bounds.
-  rankOuter: {
-    position: "absolute",
-    left:     0,
-    bottom:   0,
-    width:    BADGE_W,
-    height:   CARD_H,
-    zIndex:   1,
-    overflow: "hidden",
-  },
-
-  // Android fallback — dark semi-transparent panel with a faint border
-  glassAndroid: {
-    backgroundColor: "rgba(10,12,22,0.72)",
-    borderRightWidth: 1,
-    borderColor:     "rgba(255,255,255,0.12)",
-  },
-
-  // Glass rim — top + right edge highlight (the "glass edge" catch-light)
-  glassBorder: {
+  // Number layer: absolute, full item width, behind poster (zIndex 0)
+  numberLayer: {
     ...StyleSheet.absoluteFillObject,
-    borderTopWidth:   1,
-    borderRightWidth: 1,
-    borderColor:      "rgba(255,255,255,0.18)",
+    zIndex:   0,
+    overflow: "visible",
   },
 
   // ── Poster ────────────────────────────────────────────────────────────────
   posterCol: {
-    marginLeft: POSTER_OFFSET,
+    // Push poster to the right so number peeks from the left
+    marginLeft: NUM_VISIBLE,
     zIndex:     10,
   },
 
   posterWrap: {
     width:           CARD_W,
     height:          CARD_H,
-    borderRadius:    10,
+    borderRadius:    12,
     overflow:        "hidden",
     backgroundColor: "#1c1c1c",
-    // Deep shadow for the "card floating over number" depth effect
+    // Drop shadow gives the "card floating over number" depth
     shadowColor:     "#000",
-    shadowOffset:    { width: -6, height: 6 },
-    shadowOpacity:   0.72,
-    shadowRadius:    12,
-    elevation:       12,
+    shadowOffset:    { width: -8, height: 4 },
+    shadowOpacity:   0.80,
+    shadowRadius:    14,
+    elevation:       14,
   },
 
   poster: {
@@ -459,7 +456,26 @@ const s = StyleSheet.create({
     left:     0,
     right:    0,
     bottom:   0,
-    height:   CARD_H * 0.32,
+    height:   CARD_H * 0.30,
+  },
+
+  // ── Edge fades ────────────────────────────────────────────────────────────
+  fadeLeft: {
+    position: "absolute",
+    top:      0,
+    left:     0,
+    width:    FADE_W,
+    bottom:   0,
+    zIndex:   20,
+  },
+
+  fadeRight: {
+    position: "absolute",
+    top:      0,
+    right:    0,
+    width:    FADE_W,
+    bottom:   0,
+    zIndex:   20,
   },
 
   // ── Skeleton ──────────────────────────────────────────────────────────────
@@ -469,8 +485,10 @@ const s = StyleSheet.create({
     gap:               ITEM_GAP,
     alignItems:        "flex-end",
   },
+
   skeletonItem: {
     flexDirection: "row",
     alignItems:    "flex-end",
+    gap:           0,
   },
 });
