@@ -169,36 +169,30 @@ export function ContinueWatchingRow() {
     setItems((prev) => prev.filter((p) => p.movieId !== movieId));
   }, []);
 
+  if (items.length === 0) return null;
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Continue Watching</Text>
-      {items.length > 0 ? (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.movieId}
-          renderItem={({ item }) => (
-            <WatchCard item={item} onRemove={handleRemove} />
-          )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={{ width: ITEM_GAP }} />}
-          getItemLayout={(_, index) => ({
-            length: CARD_WIDTH + ITEM_GAP,
-            offset: (CARD_WIDTH + ITEM_GAP) * index,
-            index,
-          })}
-          removeClippedSubviews={Platform.OS !== "web"}
-          maxToRenderPerBatch={5}
-          windowSize={3}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <Feather name="play-circle" size={20} color="#555" />
-          <Text style={styles.emptyTitle}>Start watching to see titles here</Text>
-          <Text style={styles.emptySubtitle}>Your in-progress movies and shows will appear in this row.</Text>
-        </View>
-      )}
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.movieId}
+        renderItem={({ item }) => (
+          <WatchCard item={item} onRemove={handleRemove} />
+        )}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={{ width: ITEM_GAP }} />}
+        getItemLayout={(_, index) => ({
+          length: CARD_WIDTH + ITEM_GAP,
+          offset: (CARD_WIDTH + ITEM_GAP) * index,
+          index,
+        })}
+        removeClippedSubviews={Platform.OS !== "web"}
+        maxToRenderPerBatch={5}
+        windowSize={3}
+      />
     </View>
   );
 }
