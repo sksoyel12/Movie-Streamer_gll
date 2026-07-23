@@ -230,6 +230,21 @@ export default function PlayerScreen() {
     setAutoplayCountdown(null);
   }, [getNextEpisode]);
 
+  const saveEmbedProgress = useCallback((positionSec: number, durationSec: number) => {
+    if (!id || positionSec <= 5 || durationSec <= 0) return;
+    void saveProgress({
+      movieId: id,
+      positionSec,
+      durationSec,
+      updatedAt: Date.now(),
+      title: title_param || movie?.title,
+      posterUri:
+        movie?.poster && typeof movie.poster === "object" && "uri" in movie.poster
+          ? (movie.poster as { uri: string }).uri
+          : undefined,
+    });
+  }, [id, movie?.poster, movie?.title, title_param]);
+
   useEffect(() => {
     if (autoplayCountdown === null) return;
     if (autoplayCountdown <= 0) { startNextEpisode(); return; }
@@ -405,6 +420,7 @@ export default function PlayerScreen() {
         nextEpisode={embedNextEp}
         onBack={handleBack}
         onNextEpisode={embedNextEp ? startNextEpisode : undefined}
+        onProgress={saveEmbedProgress}
       />
     );
   }
@@ -431,6 +447,7 @@ export default function PlayerScreen() {
         nextEpisode={embedNextEp}
         onBack={handleBack}
         onNextEpisode={embedNextEp ? startNextEpisode : undefined}
+        onProgress={saveEmbedProgress}
       />
     );
   }

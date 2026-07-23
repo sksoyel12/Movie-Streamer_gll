@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 
 export const PROFILE_KEY = "smovie_selected_profile";
 export const CUSTOM_KEY = "smovie_profile_customs";
@@ -46,6 +48,8 @@ type ProfileContextType = {
   selectProfile: (id: string) => Promise<void>;
   clearProfile: () => Promise<void>;
   authUserName: string | null;
+  authUser: User | null;
+  authLoaded: boolean;
   customs: Record<string, ProfileCustom>;
   extraProfiles: Profile[];
   addProfile: (name: string, color: string) => Promise<void>;
@@ -64,6 +68,8 @@ const ProfileContext = createContext<ProfileContextType>({
   selectProfile: async () => {},
   clearProfile: async () => {},
   authUserName: null,
+  authUser: null,
+  authLoaded: false,
   customs: {},
   extraProfiles: [],
   addProfile: async () => {},
@@ -80,15 +86,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [authUserName, setAuthUserName] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
   const [customs, setCustoms] = useState<Record<string, ProfileCustom>>({});
   const [extraProfiles, setExtraProfiles] = useState<Profile[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [saved, authRaw, customsRaw, extrasRaw] = await Promise.all([
+        const [saved, customsRaw, extrasRaw] = await Promise.all([
           AsyncStorage.getItem(PROFILE_KEY),
-          AsyncStorage.getItem(AUTH_USER_KEY),
           AsyncStorage.getItem(CUSTOM_KEY),
           AsyncStorage.getItem(EXTRA_PROFILES_KEY),
         ]);
@@ -106,14 +113,27 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           if (found) setProfile(found);
         }
 
-        if (authRaw) setAuthUserName(authRaw);
-
         if (customsRaw) {
           try { setCustoms(JSON.parse(customsRaw)); } catch {}
         }
       } catch {}
       setProfileLoaded(true);
     })();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      setAuthUser(user);
+      setAuthUserName(user?.displayName ?? user?.email ?? user?.phoneNumber ?? null);
+      setAuthLoaded(true);
+      if (user) {
+        AsyncStorage.removeItem(AUTH_USER_KEY).catch(() => {});
+      } else {
+        AsyncStorage.removeItem(AUTH_USER_KEY).catch(() => {});
+        setAuthUserName(null);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const selectProfile = useCallback(async (id: string) => {
@@ -225,6 +245,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         selectProfile,
         clearProfile,
         authUserName,
+        authUser,
+        authLoaded,
         customs,
         extraProfiles,
         addProfile,

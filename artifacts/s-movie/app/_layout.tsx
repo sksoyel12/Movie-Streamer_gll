@@ -387,10 +387,6 @@ export default function RootLayout() {
     if (!fontsLoaded && !fontError) return;
     (async () => {
       try {
-        const authUser = await AsyncStorage.getItem("smovie_auth_user");
-        if (!authUser) {
-          await AsyncStorage.setItem("smovie_auth_user", "Guest User");
-        }
         const selectedProfile = await AsyncStorage.getItem("smovie_selected_profile");
         if (!selectedProfile) {
           await AsyncStorage.setItem("smovie_selected_profile", "sksoyel");

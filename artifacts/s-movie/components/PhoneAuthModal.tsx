@@ -396,6 +396,8 @@ const styles = StyleSheet.create({
   },
   phoneField: {
     height: 52,
+    width: "100%",
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1a1a1a",
@@ -403,9 +405,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2a2a2a",
     marginBottom: 12,
+    overflow: "hidden",
   },
   countryCode: {
-    width: 62,
+    width: 54,
+    minWidth: 54,
     color: "#fff",
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
@@ -418,6 +422,8 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
+    minWidth: 0,
+    width: 0,
     color: "#fff",
     fontSize: 15,
     fontFamily: "Inter_400Regular",

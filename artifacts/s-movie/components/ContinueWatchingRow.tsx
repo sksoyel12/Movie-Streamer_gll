@@ -16,6 +16,7 @@ import {
 import { findMovie } from "@/data/movies";
 import { haptic } from "@/lib/haptics";
 import { clearProgress, loadAllProgress, type WatchProgress } from "@/lib/watchProgress";
+import { useProfile } from "@/contexts/ProfileContext";
 
 const CARD_WIDTH = 120;
 const CARD_HEIGHT = 180;
@@ -87,7 +88,7 @@ function WatchCard({
         >
           {imageSource ? (
             <SmartImage
-              source={imageSource}
+              source={imageSource as any}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
             />
@@ -117,7 +118,7 @@ function WatchCard({
               colors={["#E50914", "#FF6B35"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.progressFill, { width: pct }]}
+              style={[styles.progressFill, { width: pct as any }]}
             />
           </View>
         </Pressable>
@@ -148,17 +149,19 @@ function WatchCard({
 
 export function ContinueWatchingRow() {
   const [items, setItems] = useState<WatchProgress[]>([]);
+  const { authUser, authLoaded } = useProfile();
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      if (!authLoaded) return () => { active = false; };
       loadAllProgress().then((all) => {
         if (active) setItems(all.slice(0, MAX_ITEMS));
       });
       return () => {
         active = false;
       };
-    }, []),
+    }, [authLoaded, authUser?.uid]),
   );
 
   const handleRemove = useCallback(async (movieId: string) => {

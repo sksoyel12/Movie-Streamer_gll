@@ -38,10 +38,9 @@ import { saveFeedback } from "@/lib/movieLinks";
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
-  getRedirectResult,
   sendPasswordResetEmail,
+  signInWithPopup,
   signInWithEmailAndPassword,
-  signInWithRedirect,
   signOut as firebaseSignOut,
   updateProfile,
 } from "firebase/auth";
@@ -114,7 +113,14 @@ export default function ProfileScreen() {
   const [customAvatarUri, setCustomAvatarUri] = useState<string | null>(null);
   const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
 
-  const { profile, clearProfile, getDisplayAvatar, getDisplayName: getCtxDisplayName } = useProfile();
+  const {
+    profile,
+    clearProfile,
+    getDisplayAvatar,
+    getDisplayName: getCtxDisplayName,
+    authUser,
+    authLoaded,
+  } = useProfile();
   const activeProfileData = APP_PROFILES.find(p => p.id === profile?.id) ?? APP_PROFILES[0];
   const contextAvatarUri = profile ? getDisplayAvatar(profile.id) : null;
   const [toast, setToast] = useState<{ msg: string; kind: "info" | "ok" | "err" } | null>(null);
@@ -177,54 +183,31 @@ export default function ProfileScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Firebase auth is the source of truth. Keep the profile badge and local
+  // cache synchronized whenever Firebase restores or changes the session.
+  useEffect(() => {
+    if (!authLoaded) return;
+    if (!authUser) {
+      setGoogleUser(null);
+      setIdentity(null);
+      AsyncStorage.removeItem(GOOGLE_USER_KEY).catch(() => {});
+      return;
+    }
+
+    const account: GoogleUser = {
+      name: authUser.displayName ?? authUser.email ?? authUser.phoneNumber ?? "S MOVIE ORIGINAL User",
+      email: authUser.email ?? authUser.phoneNumber ?? authUser.uid,
+      picture: authUser.photoURL ?? undefined,
+    };
+    setGoogleUser(account);
+    AsyncStorage.removeItem("smovie_auth_user").catch(() => {});
+    AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account)).catch(() => {});
+  }, [authLoaded, authUser]);
+
   // Load VIP status on mount
   useEffect(() => {
     const uid = firebaseAuth.currentUser?.uid ?? null;
     getVIPStatus(uid).then(setIsVIP).catch(() => {});
-  }, []);
-
-  // Handle Google redirect result on page load (after returning from Google OAuth)
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    setSigningIn(true);
-    console.log("[GoogleSignIn] Checking for redirect result…");
-    getRedirectResult(firebaseAuth)
-      .then(async (result) => {
-        if (!result) {
-          console.log("[GoogleSignIn] No redirect result (normal on first load).");
-          return;
-        }
-        console.log("[GoogleSignIn] Redirect result received:", {
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          providerId: result.providerId,
-        });
-        const fbUser = result.user;
-        const user: GoogleUser = {
-          name: fbUser.displayName ?? fbUser.email ?? "S MOVIE ORIGINAL User",
-          email: fbUser.email ?? fbUser.uid,
-          picture: fbUser.photoURL ?? undefined,
-        };
-        setGoogleUser(user);
-        await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(user));
-        showToast("Welcome! 🎬 Login successful", "ok");
-        await syncIdentity(user);
-      })
-      .catch((e: unknown) => {
-        const err = e as { code?: string; message?: string };
-        const code = err?.code ?? "";
-        const message = err?.message ?? String(e);
-        if (code && code !== "auth/no-auth-event") {
-          console.error("[GoogleSignIn] Redirect result error:", { code, message });
-          showToast(`Sign-in failed: ${code}`, "err");
-        } else if (code === "auth/no-auth-event") {
-          console.log("[GoogleSignIn] auth/no-auth-event — no redirect in progress.");
-        }
-      })
-      .finally(() => setSigningIn(false));
-  // Run once on mount only
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -233,24 +216,40 @@ export default function ProfileScreen() {
       showToast("Google Sign-In is only available on web.", "info");
       return;
     }
+    setSigningIn(true);
     try {
-      console.log("[GoogleSignIn] Initiating signInWithRedirect…", {
+      console.log("[GoogleSignIn] Initiating signInWithPopup…", {
         authDomain: firebaseAuth.config.authDomain,
         currentOrigin: typeof window !== "undefined" ? window.location.origin : "N/A",
       });
       const provider = new GoogleAuthProvider();
       // Force account selection every time so users can switch accounts
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithRedirect(firebaseAuth, provider);
-      // Page will redirect to Google — execution stops here
+      const result = await signInWithPopup(firebaseAuth, provider);
+      const fbUser = result.user;
+      const account: GoogleUser = {
+        name: fbUser.displayName ?? fbUser.email ?? "S MOVIE ORIGINAL User",
+        email: fbUser.email ?? fbUser.uid,
+        picture: fbUser.photoURL ?? undefined,
+      };
+      setGoogleUser(account);
+      setIdentity(null);
+      await AsyncStorage.removeItem("smovie_auth_user");
+      await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
+      setShowAuthModal(false);
+      setShowGoogleModal(false);
+      await syncIdentity(account);
+      showToast("Welcome! Login successful.", "ok");
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       const code = err?.code ?? "";
       const message = err?.message ?? String(e);
-      console.error("[GoogleSignIn] signInWithRedirect error:", { code, message });
+      console.error("[GoogleSignIn] signInWithPopup error:", { code, message });
       showToast(`Sign-in error: ${code || message || "Unknown error"}`, "err");
+    } finally {
+      setSigningIn(false);
     }
-  }, [googleUser, showToast]);
+  }, [googleUser, showToast, syncIdentity]);
 
   const handleGoogleSignOut = useCallback(async () => {
     setGoogleUser(null);

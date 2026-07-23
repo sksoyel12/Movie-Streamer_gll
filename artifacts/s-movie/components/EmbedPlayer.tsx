@@ -292,6 +292,16 @@ const INJECT_AFTER = `
     video.addEventListener('error',    onVideoEvent('video_error'));
     video.addEventListener('waiting',  onVideoEvent('video_buffering'));
     video.addEventListener('timeupdate', function() {
+      if (video.duration > 0 && window.ReactNativeWebView) {
+        var now = Date.now();
+        if (!video.__smovieLastProgress || now - video.__smovieLastProgress >= 5000) {
+          video.__smovieLastProgress = now;
+          window.ReactNativeWebView.postMessage('video_progress:' + JSON.stringify({
+            positionSec: video.currentTime,
+            durationSec: video.duration
+          }));
+        }
+      }
       if (video.duration > 0 && video.currentTime / video.duration > 0.95) {
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage('video_near_end');
       }
@@ -349,6 +359,7 @@ interface EmbedPlayerProps {
   nextEpisode?: { season: number; episode: number } | null;
   onBack?:      () => void;
   onNextEpisode?: () => void;
+  onProgress?: (positionSec: number, durationSec: number) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -362,6 +373,7 @@ export default function EmbedPlayer({
   nextEpisode,
   onBack,
   onNextEpisode,
+  onProgress,
 }: EmbedPlayerProps) {
   // Source ordering — starts as default array index, re-sorted after latency race
   const [sourceOrder, setSourceOrder] = useState<number[]>(
@@ -524,6 +536,23 @@ export default function EmbedPlayer({
         videoStartedRef.current = true;
         setLoading(false);
       }
+      if (msg.startsWith("video_progress:")) {
+        try {
+          const progress = JSON.parse(msg.slice("video_progress:".length)) as {
+            positionSec?: number;
+            durationSec?: number;
+          };
+          if (
+            typeof progress.positionSec === "number" &&
+            typeof progress.durationSec === "number" &&
+            progress.positionSec > 0
+          ) {
+            onProgress?.(progress.positionSec, progress.durationSec);
+          }
+        } catch {
+          // Ignore malformed messages from third-party embeds.
+        }
+      }
       if (msg === "video_ended") startNextEpCountdown();
       if (msg === "video_near_end" && !nearEndFired.current && mediaType === "tv") {
         nearEndFired.current = true;
@@ -533,7 +562,7 @@ export default function EmbedPlayer({
         if (!videoStartedRef.current) switchToNext();
       }
     },
-    [startNextEpCountdown, mediaType, switchToNext],
+    [onProgress, startNextEpCountdown, mediaType, switchToNext],
   );
 
   const handleLoadStart = useCallback(() => { setLoading(true); }, []);

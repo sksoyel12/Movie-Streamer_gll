@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, browserLocalPersistence, browserSessionPersistence, setPersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // ─── Firebase config — project: movie-original ────────────────────────────────
 // authDomain drives which domain Google's OAuth consent screen shows under
@@ -49,6 +50,7 @@ export const firebaseConfigReady = Boolean(firebaseConfig.apiKey);
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const firebaseAuth = getAuth(app);
+export const firebaseDb = getFirestore(app);
 
 // ─── Explicitly set localStorage persistence (avoids IndexedDB failures in
 //     iframes and mobile WebViews, which is required for signInWithRedirect) ──
