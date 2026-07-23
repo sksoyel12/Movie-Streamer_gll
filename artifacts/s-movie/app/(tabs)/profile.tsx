@@ -27,6 +27,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AIChatbotModal from "@/components/AIChatbotModal";
+import { ContinueWatchingRow } from "@/components/ContinueWatchingRow";
 import SubscriptionScreen from "@/components/SubscriptionScreen";
 import { firebaseAuth } from "@/lib/firebase";
 import { getVIPStatus } from "@/lib/subscription";
@@ -601,70 +602,21 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* ─── Settings sections ────────────────────────── */}
-          <Section title={t.sectionAccount}>
+          {/* ─── Menu (strict order) ──────────────────────── */}
+          <Section>
             <SettingsRow
-              icon={<Ionicons name="notifications-outline" size={21} color="#fff" />}
-              label={t.notifications}
-              sub={t.notificationsSub}
+              icon={<Ionicons name="person-circle-outline" size={21} color="#fff" />}
+              label="Manage Profile"
+              sub="Edit name, avatar & display settings"
               right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => router.push("/notification-settings")}
-            />
-            <SettingsRow
-              icon={<Ionicons name="time-outline" size={21} color="#fff" />}
-              label={t.watchHistory}
-              sub={t.noHistoryYet}
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => setShowWatchHistoryModal(true)}
-            />
-            <SettingsRow
-              icon={<Ionicons name="language-outline" size={21} color="#fff" />}
-              label={t.languageSubtitles}
-              sub={language === "hi" ? "हिंदी" : "English"}
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => setShowLanguageModal(true)}
+              onPress={openEditModal}
             />
           </Section>
 
-          <Section title={t.sectionApp}>
-            <SettingsRow
-              icon={<Ionicons name="crown-outline" size={21} color={isVIP ? "#FFD700" : "#fff"} />}
-              label="Subscription"
-              sub={isVIP ? "✓ VIP Active — All features unlocked" : "Go VIP · AI Pro + More"}
-              badge={isVIP ? "VIP" : "UPCOMING"}
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => {
-                if (isVIP) { setShowSubscription(true); return; }
-                haptic.light();
-                Alert.alert("Feature coming soon!", "Subscriptions aren't available yet — check back soon.");
-              }}
-            />
-            <SettingsRow
-              icon={<MaterialCommunityIcons name="cloud-download-outline" size={21} color="#fff" />}
-              label={updateState === "idle" || updateState === "upToDate" ? "Check for Updates" :
-                updateState === "checking" ? "Checking…" :
-                updateState === "available" ? `v${availableInfo?.version} available` :
-                updateState === "downloading" ? `Downloading… ${downloadPercent}%` :
-                "Installing…"}
-              sub={`Current version: v${CURRENT_VERSION}`}
-              onPress={!updateBusy ? checkForUpdates : undefined}
-              disabled={updateBusy}
-              badge={updateState === "available" ? "NEW" : undefined}
-              right={updateBusy
-                ? <ActivityIndicator size="small" color="#0EA5E9" />
-                : <Feather name="chevron-right" size={18} color="#404040" />}
-            />
+          {/* Continue Watching — horizontal Netflix-style poster row */}
+          <ContinueWatchingRow />
 
-            <SettingsRow
-              icon={<Feather name="bookmark" size={21} color="#fff" />}
-              label="My List"
-              sub="Movies and shows you've saved"
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => router.push({ pathname: "/see-all/[category]", params: { category: "My List" } })}
-            />
-          </Section>
-
-          <Section title={t.sectionSupport}>
+          <Section>
             <SettingsRow
               icon={<Ionicons name="cloud-download-outline" size={21} color="#fff" />}
               label={t.myDownloads}
@@ -678,6 +630,27 @@ export default function ProfileScreen() {
                 : undefined}
             />
             <SettingsRow
+              icon={<Ionicons name="language-outline" size={21} color="#fff" />}
+              label="Preferred Subtitles"
+              sub={language === "hi" ? "हिंदी" : "English"}
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => setShowLanguageModal(true)}
+            />
+            <SettingsRow
+              icon={<Ionicons name="time-outline" size={21} color="#fff" />}
+              label={t.watchHistory}
+              sub={t.noHistoryYet}
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => setShowWatchHistoryModal(true)}
+            />
+            <SettingsRow
+              icon={<Feather name="bookmark" size={21} color="#fff" />}
+              label="My List"
+              sub="Movies and shows you've saved"
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => router.push({ pathname: "/see-all/[category]", params: { category: "My List" } })}
+            />
+            <SettingsRow
               icon={<Ionicons name="settings-outline" size={21} color="#fff" />}
               label="Settings"
               sub="Preferences, playback, privacy & more"
@@ -687,21 +660,14 @@ export default function ProfileScreen() {
             <SettingsRow
               icon={<Feather name="message-square" size={21} color="#fff" />}
               label="Feedback"
-              sub="App ke baare mein apni raay do"
+              sub="Share your thoughts with the team"
               right={<Feather name="chevron-right" size={18} color="#404040" />}
               onPress={() => { setFeedbackText(""); setFeedbackSent(false); setShowFeedback(true); }}
             />
             <SettingsRow
-              icon={<Feather name="shield" size={21} color="#fff" />}
-              label={t.privacyTerms}
-              sub="Data usage policy"
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => router.push("/privacy")}
-            />
-            <SettingsRow
               icon={<Feather name="info" size={21} color="#fff" />}
               label="About"
-              sub="App version, device info & ESN"
+              sub="App version, device info & diagnostics"
               right={<Feather name="chevron-right" size={18} color="#404040" />}
               onPress={() => router.push("/about")}
             />
@@ -1925,10 +1891,10 @@ const histStyles = StyleSheet.create({
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
       <View style={styles.sectionBody}>{children}</View>
     </View>
   );

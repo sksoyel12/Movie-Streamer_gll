@@ -1,6 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
+import * as Device from "expo-device";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Network from "expo-network";
 import { LinearGradient } from "expo-linear-gradient";
@@ -54,7 +55,10 @@ export default function SettingsScreen() {
 
   const [networkLabel, setNetworkLabel]       = useState("—");
   const [freeSpace, setFreeSpace]             = useState("—");
-  const [totalSpace, setTotalSpace]           = useState("—");
+  const [usedSpace, setUsedSpace]             = useState("—");
+  const [deviceModel, setDeviceModel]         = useState("—");
+  const [buildId, setBuildId]                 = useState("—");
+  const [osApi, setOsApi]                     = useState("—");
 
   const [checkingUpdate, setCheckingUpdate]   = useState(false);
 
@@ -79,19 +83,33 @@ export default function SettingsScreen() {
   // ── Device / network / storage info for the footer ──────────────────────
   useEffect(() => {
     (async () => {
+      // Network type — try to detect 5G vs 4G via connection subtype
       try {
         const state = await Network.getNetworkStateAsync();
         const type = state.type;
-        const label =
+        let label =
           type === Network.NetworkStateType.WIFI ? "WIFI" :
           type === Network.NetworkStateType.CELLULAR ? "CELLULAR" :
           type === Network.NetworkStateType.NONE ? "OFFLINE" :
           "UNKNOWN";
+        // Attempt 5G detection via NetworkInformation API (web/Android)
+        if (type === Network.NetworkStateType.CELLULAR && typeof navigator !== "undefined") {
+          const conn = (navigator as any).connection ?? (navigator as any).mozConnection ?? (navigator as any).webkitConnection;
+          const effectiveType: string = conn?.effectiveType ?? "";
+          const downlink: number = conn?.downlink ?? 0;
+          if (effectiveType === "4g" && downlink > 100) label = "NETWORK_5G";
+          else if (effectiveType === "4g") label = "NETWORK_4G";
+          else if (effectiveType === "3g") label = "NETWORK_3G";
+          else if (label === "CELLULAR") label = "NETWORK_CELLULAR";
+        } else if (label === "WIFI") {
+          label = "NETWORK_WIFI";
+        }
         setNetworkLabel(state.isConnected === false ? "OFFLINE" : label);
       } catch {
         setNetworkLabel("UNKNOWN");
       }
 
+      // Storage
       if (Platform.OS !== "web") {
         try {
           const [free, total] = await Promise.all([
@@ -99,11 +117,28 @@ export default function SettingsScreen() {
             FileSystem.getTotalDiskCapacityAsync(),
           ]);
           setFreeSpace(formatBytes(free));
-          setTotalSpace(formatBytes(total));
+          const used = Math.max(0, total - free);
+          setUsedSpace(formatBytes(used));
         } catch {
           setFreeSpace("—");
-          setTotalSpace("—");
+          setUsedSpace("—");
         }
+      }
+
+      // Device hardware info
+      try {
+        const model = Device.modelName ?? Device.deviceName ?? "Unknown";
+        setDeviceModel(model);
+
+        // Build ID: Android uses osBuildId, iOS uses buildId field
+        const bid = (Device as any).osBuildId ?? Application.nativeBuildVersion ?? "—";
+        setBuildId(String(bid));
+
+        // OS API: Android API level or OS version
+        const apiLevel = (Device as any).platformApiLevel ?? Device.osVersion ?? Platform.Version;
+        setOsApi(String(apiLevel));
+      } catch {
+        setDeviceModel("Unknown");
       }
     })();
   }, []);
@@ -302,7 +337,7 @@ export default function SettingsScreen() {
 
         {/* ── Version / device / network footer ───────────────────────── */}
         <Text style={styles.versionText}>
-          {`v${Application.nativeApplicationVersion ?? CURRENT_VERSION} | NETWORK_${networkLabel} | ${freeSpace} | ${totalSpace}`}
+          {`v${Application.nativeApplicationVersion ?? CURRENT_VERSION} | Build:${buildId} | API:${osApi} | ${deviceModel} | ${networkLabel} | Used:${usedSpace} | Free:${freeSpace}`}
         </Text>
       </ScrollView>
 

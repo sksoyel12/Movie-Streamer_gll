@@ -38,6 +38,7 @@ import { haptic } from "@/lib/haptics";
 import {
   getCachedVideos,
   setCachedVideos,
+  prefetchVideos,
   type VideoEntry,
 } from "@/lib/trailerCache";
 
@@ -133,9 +134,11 @@ function YoutubeEmbed({
 interface ClipCardProps {
   item: ClipItem;
   isVisible: boolean;
+  /** Pre-warm: mount a hidden, muted player so the next clip buffers in advance */
+  isAdjacent?: boolean;
 }
 
-const ClipCard = React.memo(function ClipCard({ item, isVisible }: ClipCardProps) {
+const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: ClipCardProps) {
   const [showTrailerModal, setShowTrailerModal] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -178,25 +181,39 @@ const ClipCard = React.memo(function ClipCard({ item, isVisible }: ClipCardProps
       style={[styles.card, { height: CLIP_H }]}
       onPress={handleCardPress}
     >
-      {/* Muted auto-play preview when this card is visible */}
-      {isVisible && item.youtubeKey ? (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]}>
-          <YoutubeEmbed videoKey={item.youtubeKey} muted autoplay />
+      {/* Thumbnail — always rendered so it shows instantly before player is ready */}
+      <SmartImage
+        source={
+          item.backdropUri
+            ? { uri: item.backdropUri }
+            : item.posterUri
+            ? { uri: item.posterUri }
+            : null
+        }
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+
+      {/* Sliding-window player pool:
+          - isVisible  → active, auto-playing, unmuted layer (z=1)
+          - isAdjacent → pre-warmed, fully hidden, muted (z=-1, opacity 0)
+            The WebView is mounted in advance so it buffers while out of view.
+            On swipe it instantly becomes visible without a cold-mount delay. */}
+      {(isVisible || isAdjacent) && item.youtubeKey ? (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              zIndex: isVisible ? 1 : -1,
+              opacity: isVisible ? 1 : 0,
+            },
+          ]}
+          pointerEvents={isVisible ? "auto" : "none"}
+        >
+          <YoutubeEmbed videoKey={item.youtubeKey} muted autoplay={isVisible} />
         </View>
-      ) : (
-        <SmartImage
-          source={
-            item.backdropUri
-              ? { uri: item.backdropUri }
-              : item.posterUri
-              ? { uri: item.posterUri }
-              : null
-          }
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-        />
-      )}
+      ) : null}
 
       {/* Gradient overlay — always on top of media */}
       <LinearGradient
@@ -391,6 +408,17 @@ export default function ClipsScreen() {
 
   useEffect(() => { fetchClips(); }, []);
 
+  // Prefetch video metadata for the next 2 items whenever the visible index changes.
+  // Runs silently in the background — never blocks the UI or duplicates TMDB calls.
+  useEffect(() => {
+    if (clips.length === 0) return;
+    const upcoming = clips
+      .slice(visibleIndex + 1, visibleIndex + 3)
+      .map((c) => ({ tmdbId: c.tmdbId, mediaType: c.mediaType }));
+    if (upcoming.length === 0) return;
+    prefetchVideos(upcoming, tmdb.videos.bind(tmdb)).catch(() => {});
+  }, [visibleIndex, clips]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchClips();
@@ -444,7 +472,11 @@ export default function ClipsScreen() {
         data={clips}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item, index }) => (
-          <ClipCard item={item} isVisible={index === visibleIndex} />
+          <ClipCard
+            item={item}
+            isVisible={index === visibleIndex}
+            isAdjacent={index === visibleIndex + 1}
+          />
         )}
         pagingEnabled
         snapToInterval={CLIP_H}
@@ -460,9 +492,11 @@ export default function ClipsScreen() {
         })}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        // Sliding window: 3 active instances max (current + 1 adjacent each side)
         windowSize={3}
         maxToRenderPerBatch={2}
         initialNumToRender={2}
+        removeClippedSubviews
       />
     </View>
   );
