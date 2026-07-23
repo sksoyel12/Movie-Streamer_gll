@@ -27,7 +27,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AIChatbotModal from "@/components/AIChatbotModal";
+import AuthenticationModal from "@/components/AuthenticationModal";
 import { ContinueWatchingRow } from "@/components/ContinueWatchingRow";
+import PhoneAuthModal from "@/components/PhoneAuthModal";
 import SubscriptionScreen from "@/components/SubscriptionScreen";
 import { firebaseAuth } from "@/lib/firebase";
 import { getVIPStatus } from "@/lib/subscription";
@@ -118,6 +120,8 @@ export default function ProfileScreen() {
   // ── User Account — Google Sign-In ───────────────────────────────────────────
   const [googleUser, setGoogleUser]           = useState<GoogleUser | null>(null);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPhoneAuthModal, setShowPhoneAuthModal] = useState(false);
   const [signingIn, setSigningIn]             = useState(false);
 
   // ── Unique User ID & photo-ID verification ──────────────────────────────────
@@ -445,7 +449,7 @@ export default function ProfileScreen() {
               {/* Account Sign-In button */}
               <Pressable
                 hitSlop={10}
-                onPress={handleGoogleSignIn}
+                onPress={googleUser ? handleGoogleSignIn : () => setShowAuthModal(true)}
                 disabled={signingIn}
                 style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.7 }, signingIn && { opacity: 0.5 }]}
               >
@@ -676,6 +680,52 @@ export default function ProfileScreen() {
           <Text style={styles.footer}>Made by S-Movie Team</Text>
         </ScrollView>
       </SafeAreaView>
+
+      {/* ─── Authentication Modal ─────────────────────────── */}
+      <AuthenticationModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onGooglePress={() => {
+          setShowAuthModal(false);
+          void handleGoogleSignIn();
+        }}
+        onPhonePress={() => {
+          setShowAuthModal(false);
+          setShowPhoneAuthModal(true);
+        }}
+        onSignIn={({ email }) => {
+          showToast(
+            email
+              ? "Email sign-in is ready for backend hookup."
+              : "Enter your email and password to sign in.",
+            email ? "info" : "err",
+          );
+        }}
+        onForgotPassword={(email) => {
+          showToast(
+            email
+              ? "Password recovery is ready for backend hookup."
+              : "Enter your email first to reset your password.",
+            email ? "info" : "err",
+          );
+        }}
+        onCreateAccount={() => {
+          showToast("Account creation is ready for backend hookup.", "info");
+        }}
+      />
+
+      {/* ─── Phone OTP flow launched from Authentication Modal ─── */}
+      <PhoneAuthModal
+        visible={showPhoneAuthModal}
+        onClose={() => setShowPhoneAuthModal(false)}
+        onSuccess={(user) => {
+          setShowPhoneAuthModal(false);
+          showToast(
+            `Phone verified for ${user.phoneNumber}. Account linking is ready for backend hookup.`,
+            "ok",
+          );
+        }}
+      />
 
       {/* ─── Google Account Modal ─────────────────────────── */}
       <Modal visible={showGoogleModal} transparent animationType="fade" onRequestClose={() => setShowGoogleModal(false)}>

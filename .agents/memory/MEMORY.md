@@ -1,0 +1,1 @@
+- [Imported workspace setup](workspace-setup.md) — run the existing pnpm lockfile install before typechecks or managed workflows after an import.

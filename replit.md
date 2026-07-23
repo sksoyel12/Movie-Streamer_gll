@@ -12,6 +12,7 @@ This project has 4 artifacts, each with its own workflow (already running in dev
 - **Canvas / Component Preview Server** (`artifacts/mockup-sandbox`, design sandbox, preview `/__mockup`)
 
 Other useful commands:
+- Fresh import bootstrap: `pnpm install --frozen-lockfile`
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -58,6 +59,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - The mobile app's in-app update checker calls a hardcoded production URL — harmless in dev, noisy in logs.
 - `artifacts/s-movie/package.json`'s `dev` script sets `EXPO_PUBLIC_TMDB_API_KEY=$TMDB_API_KEY` — uses fallback to `$EXPO_PUBLIC_TMDB_API_KEY` if blank.
 - The Expo web preview renders a blank black screen for this app — it's built for native (Android APK). Don't judge by in-browser screenshot.
+- After a fresh import, the Expo workflow starts cleanly after the frozen install; the imported mobile package currently has unrelated pre-existing TypeScript errors in other screens.
 
 ## Pointers
 
