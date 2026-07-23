@@ -1486,6 +1486,126 @@ export const tmdb = {
     return { ...movies, results: merged.slice(0, 20) };
   },
 
+  // ─── New category fetchers (90-row expansion) ────────────────────────────────
+
+  /** Made in Korea — all Korean-origin TV, sorted by popularity. */
+  madeInKorea: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_origin_country: "KR",
+      sort_by: "popularity.desc",
+      "first_air_date.lte": TODAY,
+      "vote_count.gte": 30,
+      page,
+    }),
+
+  /** New on Netflix — Netflix originals sorted by air date (most recent first). */
+  newOnNetflix: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_networks: 213,
+      sort_by: "first_air_date.desc",
+      "first_air_date.lte": TODAY,
+      "vote_count.gte": 10,
+      page,
+    }),
+
+  /** Asian TV Shows — broad East/SE Asian TV (KR, JP, CN, TH, HK, TW, IN). */
+  asianTVShows: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_origin_country: "KR|JP|CN|TH|HK|TW|IN",
+      sort_by: "popularity.desc",
+      "first_air_date.lte": TODAY,
+      "vote_count.gte": 30,
+      page,
+    }),
+
+  /** Korean TV Action & Adventure — KR-origin action/adventure series. */
+  koreanActionTV: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_origin_country: "KR",
+      with_genres: 10759,
+      sort_by: "popularity.desc",
+      "first_air_date.lte": TODAY,
+      "vote_count.gte": 20,
+      page,
+    }),
+
+  /** Anime Series — top-rated Japanese animation TV, separate pool from trending. */
+  animeSeries: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_genres: 16,
+      with_origin_country: "JP",
+      sort_by: "vote_average.desc",
+      "vote_average.gte": 7.5,
+      "vote_count.gte": 100,
+      "first_air_date.lte": TODAY,
+      page,
+    }),
+
+  /** Indian Movies — Hindi-language feature films sorted by popularity. */
+  indianMovies: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/movie", {
+      with_original_language: "hi",
+      sort_by: "popularity.desc",
+      "primary_release_date.lte": TODAY,
+      "vote_count.gte": 20,
+      page,
+    }),
+
+  /** Romantic Indian Movies — Hindi romance feature films. */
+  romanticIndianMovies: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/movie", {
+      with_original_language: "hi",
+      with_genres: 10749,
+      sort_by: "popularity.desc",
+      "primary_release_date.lte": TODAY,
+      "vote_count.gte": 10,
+      page,
+    }),
+
+  /** Desi & Chill — relaxed Hindi-language TV drama for casual viewing. */
+  desiAndChill: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      with_original_language: "hi",
+      sort_by: "popularity.desc",
+      "first_air_date.lte": TODAY,
+      "vote_count.gte": 10,
+      page,
+    }),
+
+  /** Romantic Comedies — romcom movies (romance + comedy genre pairing). */
+  romanticComedies: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/movie", {
+      with_genres: "10749,35",
+      sort_by: "popularity.desc",
+      "primary_release_date.lte": TODAY,
+      "vote_count.gte": 100,
+      page,
+    }),
+
+  /** US Movies dubbed in Hindi — English-language films with Hindi spoken audio. */
+  usMoviesDubbedInHindi: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/movie", {
+      with_original_language: "en",
+      with_spoken_languages: "hi",
+      sort_by: "popularity.desc",
+      "primary_release_date.lte": TODAY,
+      "vote_count.gte": 30,
+      page,
+    }),
+
+  /** Top 10 Shows in All Country Today — global daily trending TV, no region filter. */
+  top10ShowsAllCountries: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/trending/tv/day", { page }),
+
+  /**
+   * TV Recommendations factory — returns a standard (page) fetcher bound to a
+   * specific TMDB TV show ID's /recommendations endpoint. Used for "Because You
+   * Watched …" and named show rows (Goblin, Sweet Home, Lovely Runner, etc.).
+   * Falls back gracefully: if the title has no recommendations, the row collapses.
+   */
+  tvRecommendations: (tvId: number) => (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>(`/tv/${tvId}/recommendations`, { page }),
+
   /**
    * TMDB curated list by list ID — /3/list/{id}
    * Wraps the list response into the standard TMDBPage shape.
