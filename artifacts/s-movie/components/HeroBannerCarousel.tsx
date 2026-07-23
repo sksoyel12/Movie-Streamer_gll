@@ -174,13 +174,16 @@ const pc = StyleSheet.create({
   wrap: {
     width: CARD_W,
     marginRight: GAP,
+    borderRadius: CARD_R,
+    overflow: "hidden",          // clips the scale animation to rounded shape
+    backgroundColor: "transparent",
   },
   card: {
     width: CARD_W,
     height: CARD_H,
     borderRadius: CARD_R,
     overflow: "hidden",
-    backgroundColor: "#0d0d0d",
+    backgroundColor: "transparent", // no dark bleed at poster edges
   },
 });
 
