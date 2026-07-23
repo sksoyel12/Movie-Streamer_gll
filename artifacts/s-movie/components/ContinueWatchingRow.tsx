@@ -166,30 +166,36 @@ export function ContinueWatchingRow() {
     setItems((prev) => prev.filter((p) => p.movieId !== movieId));
   }, []);
 
-  if (items.length === 0) return null;
-
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Continue Watching</Text>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.movieId}
-        renderItem={({ item }) => (
-          <WatchCard item={item} onRemove={handleRemove} />
-        )}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={{ width: ITEM_GAP }} />}
-        getItemLayout={(_, index) => ({
-          length: CARD_WIDTH + ITEM_GAP,
-          offset: (CARD_WIDTH + ITEM_GAP) * index,
-          index,
-        })}
-        removeClippedSubviews={Platform.OS !== "web"}
-        maxToRenderPerBatch={5}
-        windowSize={3}
-      />
+      {items.length > 0 ? (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.movieId}
+          renderItem={({ item }) => (
+            <WatchCard item={item} onRemove={handleRemove} />
+          )}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ width: ITEM_GAP }} />}
+          getItemLayout={(_, index) => ({
+            length: CARD_WIDTH + ITEM_GAP,
+            offset: (CARD_WIDTH + ITEM_GAP) * index,
+            index,
+          })}
+          removeClippedSubviews={Platform.OS !== "web"}
+          maxToRenderPerBatch={5}
+          windowSize={3}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Feather name="play-circle" size={20} color="#555" />
+          <Text style={styles.emptyTitle}>Start watching to see titles here</Text>
+          <Text style={styles.emptySubtitle}>Your in-progress movies and shows will appear in this row.</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -209,6 +215,31 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 16,
     paddingBottom: 4,
+  },
+  emptyState: {
+    marginHorizontal: 16,
+    minHeight: 88,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#242424",
+    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  emptyTitle: {
+    color: "#b5b5b5",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 7,
+  },
+  emptySubtitle: {
+    color: "#555",
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    marginTop: 3,
   },
   cardOuter: {
     width: CARD_WIDTH,

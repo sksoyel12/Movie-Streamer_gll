@@ -30,7 +30,12 @@ import { getAuth, browserLocalPersistence, browserSessionPersistence, setPersist
 const firebaseConfig = {
   // Firebase web API keys are public configuration, but must still be supplied
   // through the Expo environment so each deployment uses its own project.
-  apiKey:            process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? "",
+  apiKey:
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY ??
+    process.env.EXPO_PUBLIC_GOOGLE_API_KEY ??
+    // Firebase web API keys are public configuration. Keep this fallback so
+    // the app can render in Expo preview before environment setup is complete.
+    "AIzaSyACikplYKRKiUffInNTZRy4Rp3EEHw_b3g",
   authDomain:        process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "movie-original.firebaseapp.com",
   projectId:         "movie-original",
   storageBucket:     "movie-original.firebasestorage.app",

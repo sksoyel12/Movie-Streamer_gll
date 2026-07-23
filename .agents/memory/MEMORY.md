@@ -1,1 +1,2 @@
 - [Imported workspace setup](workspace-setup.md) — run the existing pnpm lockfile install before typechecks or managed workflows after an import.
+- [Firebase preview configuration](firebase-preview.md) — keep the public Firebase web API-key fallback until shared Expo environment config is provisioned.

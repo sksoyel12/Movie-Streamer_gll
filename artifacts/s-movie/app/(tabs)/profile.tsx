@@ -753,7 +753,8 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* ─── Menu (strict order) ──────────────────────── */}
+          {/* ─── Netflix-style profile sections ───────────────────── */}
+          {/* Standalone top card */}
           <Section>
             <SettingsRow
               icon={<Ionicons name="person-circle-outline" size={21} color="#fff" />}
@@ -767,7 +768,8 @@ export default function ProfileScreen() {
           {/* Continue Watching — horizontal Netflix-style poster row */}
           <ContinueWatchingRow />
 
-          <Section>
+          {/* Account */}
+          <Section title="ACCOUNT">
             <SettingsRow
               icon={<Ionicons name="cloud-download-outline" size={21} color="#fff" />}
               label={t.myDownloads}
@@ -779,13 +781,6 @@ export default function ProfileScreen() {
               badge={downloads.filter(d => d.status === "complete").length > 0
                 ? String(downloads.filter(d => d.status === "complete").length)
                 : undefined}
-            />
-            <SettingsRow
-              icon={<Ionicons name="language-outline" size={21} color="#fff" />}
-              label="Preferred Subtitles"
-              sub={language === "hi" ? "हिंदी" : "English"}
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
-              onPress={() => setShowLanguageModal(true)}
             />
             <SettingsRow
               icon={<Ionicons name="time-outline" size={21} color="#fff" />}
@@ -801,6 +796,17 @@ export default function ProfileScreen() {
               right={<Feather name="chevron-right" size={18} color="#404040" />}
               onPress={() => router.push({ pathname: "/see-all/[category]", params: { category: "My List" } })}
             />
+          </Section>
+
+          {/* Settings */}
+          <Section title="SETTINGS">
+            <SettingsRow
+              icon={<Ionicons name="language-outline" size={21} color="#fff" />}
+              label="Preferred Subtitles"
+              sub={language === "hi" ? "हिंदी" : "English"}
+              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              onPress={() => setShowLanguageModal(true)}
+            />
             <SettingsRow
               icon={<Ionicons name="settings-outline" size={21} color="#fff" />}
               label="Settings"
@@ -808,6 +814,10 @@ export default function ProfileScreen() {
               right={<Feather name="chevron-right" size={18} color="#404040" />}
               onPress={() => router.push("/settings")}
             />
+          </Section>
+
+          {/* Support */}
+          <Section title="SUPPORT">
             <SettingsRow
               icon={<Feather name="message-square" size={21} color="#fff" />}
               label="Feedback"
