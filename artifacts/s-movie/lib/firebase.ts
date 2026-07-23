@@ -35,8 +35,9 @@ const firebaseConfig = {
     process.env.EXPO_PUBLIC_GOOGLE_API_KEY ??
     // Firebase web API keys are public configuration. Keep this fallback so
     // the app can render in Expo preview before environment setup is complete.
-    "AIzaSyACikplYKRKiUffInNTZRy4Rp3EEHw_b3g",
+    "AIzaSyBLjgLERkJysAS-J1Ya4OOlX8t0u049hjs",
   authDomain:        process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "movie-original.firebaseapp.com",
+  databaseURL:       "https://movie-original-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId:         "movie-original",
   storageBucket:     "movie-original.firebasestorage.app",
   messagingSenderId: "526243776584",
