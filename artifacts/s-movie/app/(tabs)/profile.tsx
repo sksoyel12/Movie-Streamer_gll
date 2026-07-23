@@ -522,6 +522,34 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
+          {/* ─── Guest Google sign-in CTA ───────────────────── */}
+          {!googleUser && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              onPress={() => void handleGoogleSignIn()}
+              disabled={signingIn}
+              style={({ pressed }) => [
+                styles.profileGoogleButton,
+                pressed && styles.profileGoogleButtonPressed,
+                signingIn && styles.profileGoogleButtonDisabled,
+              ]}
+              testID="profile-continue-with-google"
+            >
+              <View style={styles.profileGoogleIcon}>
+                {signingIn ? (
+                  <ActivityIndicator size="small" color="#1f1f1f" />
+                ) : (
+                  <Text style={styles.profileGoogleG}>G</Text>
+                )}
+              </View>
+              <Text style={styles.profileGoogleButtonText}>
+                {signingIn ? "Connecting…" : "Continue with Google"}
+              </Text>
+              {!signingIn && <Feather name="arrow-up-right" size={16} color="#a3a3a3" />}
+            </Pressable>
+          )}
+
           {/* ─── Unique User ID card (always visible when signed in) ─────── */}
           {googleUser && identity && (
             <View style={styles.uidSection}>
@@ -2255,6 +2283,49 @@ const styles = StyleSheet.create({
   },
 
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: "#1a1a1a", marginHorizontal: 0, marginBottom: 8 },
+
+  profileGoogleButton: {
+    alignSelf: "center",
+    width: "92%",
+    maxWidth: 420,
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#ffffff",
+  },
+  profileGoogleButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.985 }],
+  },
+  profileGoogleButtonDisabled: {
+    opacity: 0.65,
+  },
+  profileGoogleIcon: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileGoogleG: {
+    color: "#4285F4",
+    fontSize: 18,
+    lineHeight: 22,
+    fontFamily: "Inter_800ExtraBold",
+  },
+  profileGoogleButtonText: {
+    color: "#1f1f1f",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.1,
+  },
 
   section: { marginTop: 20, paddingHorizontal: 16 },
   sectionTitle: {
