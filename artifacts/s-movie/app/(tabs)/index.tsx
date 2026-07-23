@@ -121,26 +121,29 @@ export default function HomeScreen() {
   // every single open/refresh.
   const fetchHero = useCallback(async () => {
     try {
-      const [movieRes, kdramaRes, usShowRes] = await Promise.allSettled([
+      const [movieRes, kdramaRes, usShowRes, netflixRes] = await Promise.allSettled([
         tmdb.trendingMoviesDay(1),  // /trending/movie/day — today's #1 movie pool
         tmdb.koreanDramas(1),       // KR origin + drama genre, sorted by live popularity
         tmdb.usTVShows(1),          // US origin TV, sorted by live popularity
+        tmdb.netflixOriginals(1),   // Task 4: Netflix originals pool for hero banner
       ]);
 
-      const moviesRaw = movieRes.status  === "fulfilled" ? (movieRes.value.results  ?? []).map((m) => ({ ...m, media_type: "movie" })) : [];
-      const kdramaRaw = kdramaRes.status === "fulfilled" ? (kdramaRes.value.results ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
-      const usShowRaw = usShowRes.status === "fulfilled" ? (usShowRes.value.results ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
+      const moviesRaw   = movieRes.status   === "fulfilled" ? (movieRes.value.results   ?? []).map((m) => ({ ...m, media_type: "movie" })) : [];
+      const kdramaRaw   = kdramaRes.status  === "fulfilled" ? (kdramaRes.value.results  ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
+      const usShowRaw   = usShowRes.status  === "fulfilled" ? (usShowRes.value.results  ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
+      const netflixRaw  = netflixRes.status === "fulfilled" ? (netflixRes.value.results ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
 
       // Each pool is rotated by a seed that changes at midnight, so which
       // title from that pool leads changes daily — the underlying pool data
       // itself already updates live from TMDB every fetch.
       const pools = [
-        rotateArray(moviesRaw, dailyRotationIndex(moviesRaw.length, 1)),
-        rotateArray(kdramaRaw, dailyRotationIndex(kdramaRaw.length, 2)),
-        rotateArray(usShowRaw, dailyRotationIndex(usShowRaw.length, 3)),
+        rotateArray(moviesRaw,  dailyRotationIndex(moviesRaw.length,  1)),
+        rotateArray(kdramaRaw,  dailyRotationIndex(kdramaRaw.length,  2)),
+        rotateArray(usShowRaw,  dailyRotationIndex(usShowRaw.length,  3)),
+        rotateArray(netflixRaw, dailyRotationIndex(netflixRaw.length, 4)),
       ];
 
-      // Rotate which pool leads the banner today (Movie/K-Drama/US Show cycle).
+      // Rotate which pool leads the banner today (Movie/K-Drama/US Show/Netflix cycle).
       const leadOffset = dailyRotationIndex(pools.length, 0);
       const orderedPools = rotateArray(pools, leadOffset);
 

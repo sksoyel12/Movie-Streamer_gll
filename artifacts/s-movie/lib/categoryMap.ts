@@ -43,8 +43,8 @@ export const HOME_CATEGORIES: HomeCategory[] = [
   { kind: "movieRow", title: "Korean TV Shows",                                    fetcher: tmdb.koreanDramasIN,                 mediaType: "tv",    imageMode: "poster"   },
   // 5
   { kind: "movieRow", title: "Romantic Shows",                                     fetcher: tmdb.romanticShows,                  mediaType: "tv",    imageMode: "poster"   },
-  // 6
-  { kind: "top10",    title: "Top 10 Movies in India Today",                       fetcher: tmdb.top10MoviesIndia,               mediaType: "movie"                        },
+  // 6 — Task 4: Netflix-only content for "Top 10 Movie in India Today"
+  { kind: "top10",    title: "Top 10 Movies in India Today",                       fetcher: tmdb.top10NetflixIndia,              mediaType: "movie"                        },
   // 7
   { kind: "special",  key:  "continueWatching",                                    title:  "Continue watching"                                                            },
   // 8

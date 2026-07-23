@@ -36,7 +36,7 @@ function RowTitleText({ title, style }: { title: string; style: any }) {
 import type { HDHubMovie } from "@/lib/hdhub";
 import type { Movie } from "@/data/movies";
 import { haptic } from "@/lib/haptics";
-import { tmdb, tmdbToCard, tmdbImg, proxyUrl, type TMDBPage } from "@/lib/tmdb";
+import { tmdb, tmdbToCard, tmdbImg, proxyUrl, fetchRandomPosterUri, type TMDBPage } from "@/lib/tmdb";
 import { sortByPopularityDesc, weightedShuffleByPopularity } from "@/lib/badgeUtils";
 import HindiBadge from "@/components/HindiBadge";
 import { Skeleton } from "@/components/Skeleton";
@@ -174,16 +174,6 @@ const GlowCard = React.memo(function GlowCard({ m, index, showTop10Badge, rowTit
             <Text style={styles.top10Text}>TOP{"\n"}10</Text>
           </View>
         ) : null}
-        {/* Red ribbon badge — bottom-left, single highest-priority label */}
-        {!((m as CardItem & { isTop10?: boolean }).isTop10 && showTop10Badge) && (() => {
-          const badge = getContentBadge(m);
-          if (!badge) return null;
-          return (
-            <View style={styles.ribbonBadge} pointerEvents="none">
-              <Text style={styles.ribbonBadgeText}>{badge}</Text>
-            </View>
-          );
-        })()}
         {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
         <HindiBadge
           tmdbId={(m as any).tmdbId ?? m.id}
@@ -252,18 +242,8 @@ function mapResults(results: TMDBPage["results"]): CardItem[] {
       if (isBanned(m)) return false;
       // Hide unreleased / Coming Soon titles from home rows
       if (isUnreleased(m)) return false;
-      // Must have at least one image
-      if (!(m.poster_path || m.backdrop_path)) {
-        if (__DEV__) {
-          console.warn(`[MovieRow] Skipping "${m.title ?? m.name}" (id=${m.id}): no poster_path or backdrop_path`);
-        }
-        return false;
-      }
-      if (!m.poster_path && m.backdrop_path) {
-        if (__DEV__) {
-          console.warn(`[MovieRow] "${m.title ?? m.name}" (id=${m.id}): poster_path missing, using backdrop_path as fallback`);
-        }
-      }
+      // Task 2: Strictly require poster_path — reject anything without a valid poster
+      if (!m.poster_path) return false;
       // Skip completely unvalidated titles (no votes yet = unreleased/test entries)
       if ((m.vote_count ?? 0) < 3) return false;
       // Skip entries with no description (usually invalid/stub records)
@@ -398,10 +378,23 @@ const RowCard = React.memo(function RowCard({
   const mediaType: "movie" | "tv" =
     (m as any).mediaType ?? (title.toLowerCase().includes("shows") ? "tv" : "movie");
 
-  // poster_url from /api/tmdb proxy is already the correct image — no extra
-  // per-card /api/tmdb/{id}/images call needed (was generating 1000+ extra
-  // requests per page load, causing 429 rate-limit errors).
-  const imageUri = baseImageUri;
+  // Task 3: Netflix-style Dynamic Artwork — fetch a random alternative poster from
+  // TMDB's /images pool and swap it in once resolved. The in-memory cache in
+  // lib/tmdb.ts means each title is only fetched once per session (no 429 risk).
+  const [dynamicUri, setDynamicUri] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!tmdbId) return;
+    let cancelled = false;
+    const posterPath = (m as any).poster_path as string | null | undefined;
+    fetchRandomPosterUri(tmdbId, mediaType, posterPath).then((uri) => {
+      if (!cancelled && uri) setDynamicUri(uri);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  // refreshKey causes the row to re-shuffle; tmdbId/mediaType identify the card
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tmdbId, mediaType, refreshKey]);
+
+  const imageUri = dynamicUri ?? baseImageUri;
   const hasTop10 = showTop10Badge && (m as CardItem & { isTop10?: boolean }).isTop10;
 
   return (
@@ -446,16 +439,6 @@ const RowCard = React.memo(function RowCard({
               <Text style={styles.top10Text}>TOP{"\n"}10</Text>
             </View>
           )}
-          {/* Red ribbon badge — bottom-left, single highest-priority label */}
-          {!hasTop10 && (() => {
-            const badge = getContentBadge(m);
-            if (!badge) return null;
-            return (
-              <View style={styles.ribbonBadge} pointerEvents="none">
-                <Text style={styles.ribbonBadgeText}>{badge}</Text>
-              </View>
-            );
-          })()}
           {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
           <HindiBadge
             tmdbId={tmdbId ?? m.id}
@@ -480,18 +463,6 @@ function SkeletonRow() {
             width={CARD_W}
             height={CARD_H}
             borderRadius={10}
-          />
-          <Skeleton
-            width={CARD_W}
-            height={12}
-            borderRadius={3}
-            style={{ marginTop: 7 }}
-          />
-          <Skeleton
-            width={CARD_W * 0.65}
-            height={10}
-            borderRadius={3}
-            style={{ marginTop: 4 }}
           />
         </View>
       ))}

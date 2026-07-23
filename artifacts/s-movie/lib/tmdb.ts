@@ -1455,6 +1455,38 @@ export const tmdb = {
   },
 
   /**
+   * Top 10 Movie in India Today — STRICTLY Netflix content (network 213) in India.
+   * Merges Netflix movies (via watch provider) and Netflix TV (via network) for variety,
+   * sorted by popularity so the most-watched titles surface first.
+   */
+  top10NetflixIndia: async (page = 1): Promise<TMDBPage> => {
+    const [movies, shows] = await Promise.all([
+      get<TMDBPage>("/discover/movie", {
+        with_watch_providers: 8,   // Netflix watch provider ID
+        watch_region: "IN",
+        sort_by: "popularity.desc",
+        "primary_release_date.lte": TODAY,
+        "vote_count.gte": 10,
+        page,
+      }),
+      get<TMDBPage>("/discover/tv", {
+        with_networks: 213,         // Netflix network ID
+        sort_by: "popularity.desc",
+        "first_air_date.lte": TODAY,
+        "vote_count.gte": 20,
+        page,
+      }),
+    ]);
+    const seen = new Set<number>();
+    const merged: typeof movies.results = [];
+    for (const m of [...movies.results, ...shows.results]) {
+      if (!seen.has(m.id)) { seen.add(m.id); merged.push(m); }
+    }
+    merged.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    return { ...movies, results: merged.slice(0, 20) };
+  },
+
+  /**
    * TMDB curated list by list ID — /3/list/{id}
    * Wraps the list response into the standard TMDBPage shape.
    */
