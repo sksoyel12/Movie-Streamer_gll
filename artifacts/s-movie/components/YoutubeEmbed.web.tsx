@@ -141,7 +141,7 @@ const YoutubeEmbed = forwardRef<YoutubeEmbedRef, YoutubeEmbedProps>(
           style={controls ? fullStyle : teaserStyle}
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           allowFullScreen
-          title="S-Movie teaser"
+          title="S MOVIE ORIGINAL teaser"
           onError={onError}
         />
 

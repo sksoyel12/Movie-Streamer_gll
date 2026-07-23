@@ -1081,7 +1081,7 @@ function NativePlayerScreen({
         <View pointerEvents="none" style={styles.bufferOverlay}>
           <ActivityIndicator size="large" color="#e50914" />
           <Text style={styles.bufferText}>FETCHING STREAM...</Text>
-          <Text style={styles.bufferSubtext}>Configuring secure server channel inside S-MOVIE</Text>
+          <Text style={styles.bufferSubtext}>Configuring secure server channel inside S MOVIE ORIGINAL</Text>
         </View>
       )}
 

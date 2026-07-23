@@ -28,7 +28,9 @@ import { getAuth, browserLocalPersistence, browserSessionPersistence, setPersist
 //      custom domain in this project's production environment variables —
 //      leave it unset in development so Replit preview keeps working.
 const firebaseConfig = {
-  apiKey:            process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyACikplYKRKiUffInNTZRy4Rp3EEHw_b3g",
+  // Firebase web API keys are public configuration, but must still be supplied
+  // through the Expo environment so each deployment uses its own project.
+  apiKey:            process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? "",
   authDomain:        process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "movie-original.firebaseapp.com",
   projectId:         "movie-original",
   storageBucket:     "movie-original.firebasestorage.app",
@@ -36,6 +38,8 @@ const firebaseConfig = {
   appId:             "1:526243776584:web:884fef0ce1a9238e25707d",
   measurementId:     "G-05CBC9KBWQ",
 };
+
+export const firebaseConfigReady = Boolean(firebaseConfig.apiKey);
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const firebaseAuth = getAuth(app);

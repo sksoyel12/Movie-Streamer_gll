@@ -838,7 +838,7 @@ export default function MovieDetail() {
     try {
       await Share.share({
         title: movie.title,
-        message: `Check out "${movie.title}" on S-Movie Original! ${(movie.synopsis ?? "").slice(0, 120)}…`,
+        message: `Check out "${movie.title}" on S MOVIE ORIGINAL! ${(movie.synopsis ?? "").slice(0, 120)}…`,
         url: posterUri ?? undefined,
       } as any);
     } catch { }

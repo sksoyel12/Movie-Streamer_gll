@@ -38,7 +38,7 @@ const FEATURES: Feature[] = [
   {
     icon: <MaterialCommunityIcons name="cellphone-settings" size={22} color="#FFD700" />,
     title: "Custom App Icon",
-    desc: "Change your S-Movie icon on your home screen",
+    desc: "Change your S MOVIE ORIGINAL icon on your home screen",
   },
   {
     icon: <Ionicons name="notifications-outline" size={22} color="#FFD700" />,
@@ -144,7 +144,7 @@ export default function SubscriptionScreen({ onClose }: Props) {
         <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={12}>
           <Feather name="x" size={22} color="#888" />
         </Pressable>
-        <Text style={styles.headerTitle}>S-Movie VIP</Text>
+        <Text style={styles.headerTitle}>S MOVIE ORIGINAL VIP</Text>
         <View style={{ width: 34 }} />
       </View>
 
@@ -271,7 +271,7 @@ export default function SubscriptionScreen({ onClose }: Props) {
             <LinearGradient colors={["#052e16", "#000"]} style={styles.activeCard}>
               <Ionicons name="checkmark-circle" size={40} color="#22c55e" />
               <Text style={styles.activeTitle}>VIP Active!</Text>
-              <Text style={styles.activeSub}>All features unlocked. Enjoy S-Movie VIP.</Text>
+        <Text style={styles.activeSub}>All features unlocked. Enjoy S MOVIE ORIGINAL VIP.</Text>
               <Pressable style={styles.doneBtn} onPress={onClose}>
                 <Text style={styles.doneBtnText}>Continue</Text>
               </Pressable>

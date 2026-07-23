@@ -400,7 +400,7 @@ export default function AboutScreen() {
               <Text style={styles.logoS}>S</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.appName}>S-MOVIE ORIGINAL PREMIUM</Text>
+              <Text style={styles.appName}>S MOVIE ORIGINAL PREMIUM</Text>
               <View style={styles.badgeRow}>
                 {loading ? (
                   <View style={styles.badge}>
@@ -609,7 +609,7 @@ export default function AboutScreen() {
         </View>
 
         <Text style={styles.footerNote}>
-          © 2025 S-MOVIE ORIGINAL. All rights reserved.{"\n"}
+              © 2025 S MOVIE ORIGINAL. All rights reserved.{"\n"}
           Device data is read in real-time from your hardware.
         </Text>
       </ScrollView>

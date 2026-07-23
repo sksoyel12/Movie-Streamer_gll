@@ -138,7 +138,7 @@ const WHATSAPP_CHAT = "https://api.whatsapp.com/send?phone=917098245847";
 const WELCOME: Message = {
   id: "welcome",
   role: "model",
-  text: "Namaste! Main S-Movie Support Bot hoon. Kisi bhi language mein baat kar sakte hain — Hindi, English, Urdu ya koi bhi. App se related koi bhi issue ho toh seedha hamare team se bhi contact kar sakte hain neeche diye links se! 👇",
+  text: "Namaste! Main S MOVIE ORIGINAL Support Bot hoon. Kisi bhi language mein baat kar sakte hain — Hindi, English, Urdu ya koi bhi. App se related koi bhi issue ho toh seedha hamare team se bhi contact kar sakte hain neeche diye links se! 👇",
 };
 
 // Web Speech API type shim
@@ -630,7 +630,7 @@ export default function AIChatbotModal({ visible, onClose }: Props) {
                           {/* Email */}
                           <Pressable
                             style={({ pressed }) => [styles.contactCard, pressed && { opacity: 0.75 }]}
-                            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=S-Movie App Issue`)}
+                            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=S MOVIE ORIGINAL App Issue`)}
                           >
                             <Text style={styles.contactIcon}>📧</Text>
                             <View style={{ flex: 1 }}>
@@ -672,9 +672,9 @@ export default function AIChatbotModal({ visible, onClose }: Props) {
                             onPress={() => {
                               const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
                               const body = lastUserMsg
-                                ? encodeURIComponent(`Mera issue:\n\n${lastUserMsg.text}\n\n---\nSent from S-Movie App`)
-                                : encodeURIComponent("S-Movie App se issue report kar raha hoon.");
-                              Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=S-Movie Issue Report&body=${body}`);
+                                ? encodeURIComponent(`Mera issue:\n\n${lastUserMsg.text}\n\n---\nSent from S MOVIE ORIGINAL App`)
+                                : encodeURIComponent("S MOVIE ORIGINAL App se issue report kar raha hoon.");
+                              Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=S MOVIE ORIGINAL Issue Report&body=${body}`);
                             }}
                           >
                             <Text style={styles.contactIcon}>🚀</Text>

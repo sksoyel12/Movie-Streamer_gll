@@ -26,20 +26,20 @@ const MESSAGES: Record<NonNullable<IntegrityViolation>, { title: string; body: s
   EMULATOR: {
     title: "Real Device Required",
     body:
-      "S-Movie cannot run in an emulator or simulator. " +
+      "S MOVIE ORIGINAL cannot run in an emulator or simulator. " +
       "Please install the app on a physical Android or iOS device.",
   },
   UNKNOWN_DEVICE_TYPE: {
     title: "Unsupported Device",
     body:
       "Your device type could not be verified. " +
-      "S-Movie requires a standard Android or iOS phone or tablet.",
+      "S MOVIE ORIGINAL requires a standard Android or iOS phone or tablet.",
   },
   DEBUG_ON_DEVICE: {
     title: "Debug Build Detected",
     body:
-      "This build of S-Movie is not authorised for use on physical devices. " +
-      "Please download the official release from the S-Movie website.",
+      "This build of S MOVIE ORIGINAL is not authorised for use on physical devices. " +
+      "Please download the official release from the S MOVIE ORIGINAL website.",
   },
 };
 
@@ -63,7 +63,7 @@ export function IntegrityBlockModal({ visible, violation }: Props) {
 
           <View style={styles.steps}>
             {[
-              "Download the official S-Movie APK from our website",
+              "Download the official S MOVIE ORIGINAL APK from our website",
               "Install it on a real Android or iOS phone",
               "Open the app and enjoy ad-free streaming",
             ].map((step, i) => (
@@ -76,7 +76,7 @@ export function IntegrityBlockModal({ visible, violation }: Props) {
             ))}
           </View>
 
-          <Text style={styles.footer}>S-Movie · Official App Only</Text>
+      <Text style={styles.footer}>S MOVIE ORIGINAL · Official App Only</Text>
         </View>
       </BlurView>
     </View>

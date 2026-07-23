@@ -173,7 +173,7 @@ export default function SettingsScreen() {
       } else if (result.error) {
         Alert.alert("Couldn't Check for Updates", result.error);
       } else {
-        Alert.alert("You're up to date", `S-Movie v${CURRENT_VERSION} is the latest version.`);
+        Alert.alert("You're up to date", `S MOVIE ORIGINAL v${CURRENT_VERSION} is the latest version.`);
       }
     } finally {
       setCheckingUpdate(false);

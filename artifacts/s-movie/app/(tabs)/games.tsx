@@ -215,7 +215,7 @@ const GAMES: Game[] = [
     name: "Snake",
     genre: "Arcade",
     subgenre: "Classic",
-    description: "The classic snake game — eat food, grow longer, and don't crash into yourself. Built natively into S-MOVIE for zero-download instant play.",
+    description: "The classic snake game — eat food, grow longer, and don't crash into yourself. Built natively into S MOVIE ORIGINAL for zero-download instant play.",
     modes: "Single Player",
     native: true,
     icon: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&h=400&q=80",
@@ -403,7 +403,7 @@ const GAMES: Game[] = [
     name: "LEGO DUPLO World",
     genre: "Kids",
     subgenre: "Minigames",
-    description: "A collection of playful early-learning activities with LEGO DUPLO bricks and characters — perfect for the youngest S-MOVIE members.",
+    description: "A collection of playful early-learning activities with LEGO DUPLO bricks and characters — perfect for the youngest S MOVIE ORIGINAL members.",
     modes: "Single Player",
     packageId: "com.lego.duplo.world",
     icon: "https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=400&h=400&q=80",
@@ -810,7 +810,7 @@ function GameDetailSheet({ game, visible, onClose, onGetGame, onPlayNative }: {
           )}
 
           {/* Inclusion note */}
-          <Text style={ds.inclusive}>Included free with your S-MOVIE membership</Text>
+          <Text style={ds.inclusive}>Included free with your S MOVIE ORIGINAL membership</Text>
         </ScrollView>
       </View>
     </Modal>
@@ -874,7 +874,7 @@ export default function GamesScreen() {
 
   // "Get Game" never launches anything in-app — it hands off to the real
   // Google Play Store via a deep link (see `openPlayStore` above), while the
-  // detail sheet stays the only screen the user sees before leaving S-MOVIE.
+  // detail sheet stays the only screen the user sees before leaving S MOVIE ORIGINAL.
   const handleGetGame = (game: Game) => {
     if (!game.packageId) return;
     openPlayStore(game.packageId);

@@ -29,7 +29,7 @@ export default function OriginalsScreen() {
           <Text style={styles.brandLetter}>S</Text>
           <View style={styles.brandTextWrap}>
             <Text style={styles.brandLine}>MY</Text>
-            <Text style={styles.brandLineBig}>S-MOVIE ORIGINAL</Text>
+            <Text style={styles.brandLineBig}>S MOVIE ORIGINAL</Text>
           </View>
         </View>
 
@@ -63,7 +63,7 @@ export default function OriginalsScreen() {
             />
             <View style={styles.cardOverlay}>
               <View style={styles.originalTag}>
-                <Text style={styles.originalTagText}>S-MOVIE ORIGINAL</Text>
+                <Text style={styles.originalTagText}>S MOVIE ORIGINAL</Text>
               </View>
               <Text style={styles.cardTitle}>{m.title}</Text>
               <Text style={styles.cardMeta}>

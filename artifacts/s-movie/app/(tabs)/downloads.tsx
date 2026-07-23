@@ -107,7 +107,7 @@ function StorageBar({ info }: { info: StorageInfo }) {
         <LegendDot color="#2a2a2a" label="System" value={`${(16 * 0.42).toFixed(1)} GB`} />
         <LegendDot
           color="#0EA5E9"
-          label="S-MOVIE"
+          label="S MOVIE ORIGINAL"
           value={info.usedBytes > 0 ? formatBytes(info.usedBytes) : "0 MB"}
         />
         <LegendDot color="#141414" label="Free" value={formatGB(info.freeBytes)} border />

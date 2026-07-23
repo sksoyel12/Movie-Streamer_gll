@@ -57,7 +57,7 @@ export default function PrivacyScreen() {
         <PolicySection
           number="01"
           title="Data Privacy"
-          body="S-MOVIE Enterprise operates under a strict Zero-Knowledge architecture. Your localized streaming habits, user interactions, and catalog preferences remain fully decentralized inside your client sandbox terminal."
+          body="S MOVIE ORIGINAL Enterprise operates under a strict Zero-Knowledge architecture. Your localized streaming habits, user interactions, and catalog preferences remain fully decentralized inside your client sandbox terminal."
         />
 
         {/* Section 2 — Streaming Infrastructure */}
@@ -85,12 +85,12 @@ export default function PrivacyScreen() {
         <View style={styles.ackCard}>
           <Feather name="check-circle" size={18} color="#34D399" style={{ marginBottom: 8 }} />
           <Text style={styles.ackText}>
-            By using S-MOVIE, you acknowledge and agree to the data usage practices described above.
+            By using S MOVIE ORIGINAL, you acknowledge and agree to the data usage practices described above.
           </Text>
         </View>
 
         <Text style={styles.footerNote}>
-          © 2025 S-MOVIE ORIGINAL. All rights reserved.
+          © 2025 S MOVIE ORIGINAL. All rights reserved.
         </Text>
       </ScrollView>
     </View>

@@ -80,7 +80,7 @@ export function VpnBlockModal({ visible, onRetry }: Props) {
           <Text style={styles.title}>VPN Detected</Text>
 
           <Text style={styles.body}>
-            S-Movie requires a direct connection to protect content rights and prevent
+            S MOVIE ORIGINAL requires a direct connection to protect content rights and prevent
             abuse.{"\n\n"}
             Please <Text style={styles.bold}>disable your VPN or proxy</Text> and
             try again.

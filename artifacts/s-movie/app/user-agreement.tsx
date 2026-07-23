@@ -54,7 +54,7 @@ export default function UserAgreementScreen() {
         <AgreementSection
           number="01"
           title="Acceptance of Terms"
-          body="By creating an account or using S-MOVIE, you agree to be bound by this User Agreement and our Privacy Policy. If you do not agree, please discontinue use of the app."
+          body="By creating an account or using S MOVIE ORIGINAL, you agree to be bound by this User Agreement and our Privacy Policy. If you do not agree, please discontinue use of the app."
         />
         <AgreementSection
           number="02"
@@ -69,7 +69,7 @@ export default function UserAgreementScreen() {
         <AgreementSection
           number="04"
           title="Content & Availability"
-          body="Streaming catalog, availability, and features may change at any time without notice. S-MOVIE makes no guarantee of uninterrupted access to any specific title."
+          body="Streaming catalog, availability, and features may change at any time without notice. S MOVIE ORIGINAL makes no guarantee of uninterrupted access to any specific title."
         />
         <AgreementSection
           number="05"
@@ -85,11 +85,11 @@ export default function UserAgreementScreen() {
         <View style={styles.ackCard}>
           <Feather name="check-circle" size={18} color="#34D399" style={{ marginBottom: 8 }} />
           <Text style={styles.ackText}>
-            By using S-MOVIE, you acknowledge and agree to this User Agreement.
+            By using S MOVIE ORIGINAL, you acknowledge and agree to this User Agreement.
           </Text>
         </View>
 
-        <Text style={styles.footerNote}>© 2025 S-MOVIE ORIGINAL. All rights reserved.</Text>
+        <Text style={styles.footerNote}>© 2025 S MOVIE ORIGINAL. All rights reserved.</Text>
       </ScrollView>
     </View>
   );

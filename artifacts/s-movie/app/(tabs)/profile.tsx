@@ -31,11 +31,20 @@ import AuthenticationModal from "@/components/AuthenticationModal";
 import { ContinueWatchingRow } from "@/components/ContinueWatchingRow";
 import PhoneAuthModal from "@/components/PhoneAuthModal";
 import SubscriptionScreen from "@/components/SubscriptionScreen";
-import { firebaseAuth } from "@/lib/firebase";
+import { firebaseAuth, firebaseConfigReady } from "@/lib/firebase";
 import { getVIPStatus } from "@/lib/subscription";
 import { haptic } from "@/lib/haptics";
 import { saveFeedback } from "@/lib/movieLinks";
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut as firebaseSignOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  getRedirectResult,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithRedirect,
+  signOut as firebaseSignOut,
+  updateProfile,
+} from "firebase/auth";
 import {
   syncGoogleUser,
   getIdentity,
@@ -140,7 +149,7 @@ export default function ProfileScreen() {
       if (e instanceof DuplicateAttemptError) {
         Alert.alert(
           "Account Already Exists",
-          "This device is already linked to another S-Movie account. Please sign in with that account instead.",
+          "This device is already linked to another S MOVIE ORIGINAL account. Please sign in with that account instead.",
           [{ text: "OK" }],
         );
         await firebaseSignOut(firebaseAuth).catch(() => {});
@@ -193,7 +202,7 @@ export default function ProfileScreen() {
         });
         const fbUser = result.user;
         const user: GoogleUser = {
-          name: fbUser.displayName ?? fbUser.email ?? "S-Movie User",
+          name: fbUser.displayName ?? fbUser.email ?? "S MOVIE ORIGINAL User",
           email: fbUser.email ?? fbUser.uid,
           picture: fbUser.photoURL ?? undefined,
         };
@@ -250,6 +259,128 @@ export default function ProfileScreen() {
     await firebaseSignOut(firebaseAuth).catch(() => {});
     setShowGoogleModal(false);
     showToast("Signed out successfully.", "info");
+  }, [showToast]);
+
+  const handleEmailSignIn = useCallback(async ({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) => {
+    if (!email || !password) {
+      showToast("Enter your email and password to sign in.", "err");
+      return;
+    }
+    if (!firebaseConfigReady) {
+      showToast("Firebase is not configured. Add EXPO_PUBLIC_FIREBASE_API_KEY.", "err");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const user = result.user;
+      const account: GoogleUser = {
+        name: user.displayName ?? user.email ?? "S MOVIE ORIGINAL User",
+        email: user.email ?? email,
+        picture: user.photoURL ?? undefined,
+      };
+      setGoogleUser(account);
+      await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
+      setShowAuthModal(false);
+      showToast("Welcome back. You’re signed in.", "ok");
+    } catch (errorValue) {
+      const code = (errorValue as { code?: string })?.code ?? "";
+      const message =
+        code === "auth/invalid-credential" || code === "auth/wrong-password"
+          ? "That email or password is incorrect."
+          : code === "auth/user-not-found"
+            ? "No account was found for that email."
+            : code === "auth/too-many-requests"
+              ? "Too many attempts. Please try again later."
+              : "Unable to sign in. Please check your details and try again.";
+      showToast(message, "err");
+    } finally {
+      setSigningIn(false);
+    }
+  }, [showToast]);
+
+  const handleForgotPassword = useCallback(async (email: string) => {
+    if (!email) {
+      showToast("Enter your email first to reset your password.", "err");
+      return;
+    }
+    if (!firebaseConfigReady) {
+      showToast("Firebase is not configured. Add EXPO_PUBLIC_FIREBASE_API_KEY.", "err");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email);
+      showToast("Password reset link sent to your email.", "ok");
+    } catch (errorValue) {
+      const code = (errorValue as { code?: string })?.code ?? "";
+      showToast(
+        code === "auth/invalid-email"
+          ? "Enter a valid email address."
+          : "Unable to send the password reset email. Please try again.",
+        "err",
+      );
+    }
+  }, [showToast]);
+
+  const handleCreateAccount = useCallback(async ({
+    name,
+    email,
+    password,
+    confirmPassword,
+  }: {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  }) => {
+    if (!name || !email || !password || !confirmPassword) {
+      showToast("Complete all fields to create your account.", "err");
+      return;
+    }
+    if (password !== confirmPassword) {
+      showToast("Passwords do not match.", "err");
+      return;
+    }
+    if (password.length < 6) {
+      showToast("Your password must be at least 6 characters.", "err");
+      return;
+    }
+    if (!firebaseConfigReady) {
+      showToast("Firebase is not configured. Add EXPO_PUBLIC_FIREBASE_API_KEY.", "err");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const result = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      await updateProfile(result.user, { displayName: name });
+      const account: GoogleUser = {
+        name,
+        email: result.user.email ?? email,
+        picture: result.user.photoURL ?? undefined,
+      };
+      setGoogleUser(account);
+      await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
+      setShowAuthModal(false);
+      showToast("Your account was created successfully.", "ok");
+    } catch (errorValue) {
+      const code = (errorValue as { code?: string })?.code ?? "";
+      showToast(
+        code === "auth/email-already-in-use"
+          ? "An account already exists for that email."
+          : code === "auth/invalid-email"
+            ? "Enter a valid email address."
+            : "Unable to create your account. Please try again.",
+        "err",
+      );
+    } finally {
+      setSigningIn(false);
+    }
   }, [showToast]);
 
   const handleCopyUniqueId = useCallback(async () => {
@@ -693,7 +824,7 @@ export default function ProfileScreen() {
             />
           </Section>
 
-          <Text style={styles.footer}>Made by S-Movie Team</Text>
+          <Text style={styles.footer}>Made by S MOVIE ORIGINAL Team</Text>
         </ScrollView>
       </SafeAreaView>
 
@@ -709,25 +840,9 @@ export default function ProfileScreen() {
           setShowAuthModal(false);
           setShowPhoneAuthModal(true);
         }}
-        onSignIn={({ email }) => {
-          showToast(
-            email
-              ? "Email sign-in is ready for backend hookup."
-              : "Enter your email and password to sign in.",
-            email ? "info" : "err",
-          );
-        }}
-        onForgotPassword={(email) => {
-          showToast(
-            email
-              ? "Password recovery is ready for backend hookup."
-              : "Enter your email first to reset your password.",
-            email ? "info" : "err",
-          );
-        }}
-        onCreateAccount={() => {
-          showToast("Account creation is ready for backend hookup.", "info");
-        }}
+        onSignIn={handleEmailSignIn}
+        onForgotPassword={handleForgotPassword}
+        onCreateAccount={handleCreateAccount}
       />
 
       {/* ─── Phone OTP flow launched from Authentication Modal ─── */}
@@ -736,8 +851,14 @@ export default function ProfileScreen() {
         onClose={() => setShowPhoneAuthModal(false)}
         onSuccess={(user) => {
           setShowPhoneAuthModal(false);
+          const account: GoogleUser = {
+            name: "S MOVIE ORIGINAL User",
+            email: user.phoneNumber,
+          };
+          setGoogleUser(account);
+          void AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
           showToast(
-            `Phone verified for ${user.phoneNumber}. Account linking is ready for backend hookup.`,
+            `Phone verified for ${user.phoneNumber}. You’re signed in.`,
             "ok",
           );
         }}
@@ -759,7 +880,7 @@ export default function ProfileScreen() {
                 </View>
               )}
             </View>
-            <Text style={styles.googleModalName}>{googleUser?.name ?? "S-Movie User"}</Text>
+            <Text style={styles.googleModalName}>{googleUser?.name ?? "S MOVIE ORIGINAL User"}</Text>
             <Text style={styles.googleModalEmail}>{googleUser?.email ?? "Google Account"}</Text>
             <View style={styles.googleModalDivider} />
 

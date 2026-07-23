@@ -253,7 +253,7 @@ function OtaToast({ phase }: { phase: OtaPhase | null }) {
           {isRestarting ? "Update ready" : "Update available"}
         </Text>
         <Text style={otaStyles.sub}>
-          {isRestarting ? "Restarting S-MOVIE…" : "Downloading latest version…"}
+          {isRestarting ? "Restarting S MOVIE ORIGINAL…" : "Downloading latest version…"}
         </Text>
       </View>
       {!isRestarting && <ActivityIndicator size="small" color="#e50914" style={otaStyles.spinner} />}
@@ -319,7 +319,7 @@ function ForceUpdateModal({
             </Pressable>
 
             <Text style={uStyles.forcedNote}>
-              This update is required to continue using S-MOVIE ORIGINAL
+              This update is required to continue using S MOVIE ORIGINAL
             </Text>
           </View>
         </View>

@@ -3,7 +3,7 @@
  *
  * • Fetches trending movies/shows from TMDB + caches their videos (24 h)
  * • Snaps to each clip; auto-plays a muted preview when the card is visible
- * • Tapping the clip card opens the full-screen S-MOVIE player
+ * • Tapping the clip card opens the full-screen S MOVIE ORIGINAL player
  * • "Watch Trailer" opens the full-screen YouTube modal
  * • Only items with a backdrop/poster are shown; section hidden when empty
  */
@@ -142,7 +142,7 @@ const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: C
   const [showTrailerModal, setShowTrailerModal] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Tap on card → full-screen S-MOVIE player
+  // Tap on card → full-screen S MOVIE ORIGINAL player
   const handleCardPress = useCallback(() => {
     haptic.medium();
     router.push({

@@ -1,9 +1,12 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { firebaseAuth } from "@/lib/firebase";
+import {
+  ConfirmationResult,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
 import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -13,27 +16,8 @@ import {
   View,
 } from "react-native";
 
-// Firebase JS SDK — used only on web
-import { RecaptchaVerifier, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-
-const _PROXY_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : null);
-
-const API_BASE = _PROXY_HOST ?? "";
-
-const COUNTRY_CODES = [
-  { code: "+91",  flag: "🇮🇳", name: "India" },
-  { code: "+92",  flag: "🇵🇰", name: "Pakistan" },
-  { code: "+1",   flag: "🇺🇸", name: "USA / Canada" },
-  { code: "+44",  flag: "🇬🇧", name: "UK" },
-  { code: "+971", flag: "🇦🇪", name: "UAE" },
-  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia" },
-  { code: "+880", flag: "🇧🇩", name: "Bangladesh" },
-  { code: "+977", flag: "🇳🇵", name: "Nepal" },
-];
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { firebaseAuth, firebaseConfigReady } from "@/lib/firebase";
 
 type Step = "phone" | "otp" | "success";
 
@@ -49,72 +33,89 @@ interface Props {
   onSuccess: (user: FirebaseUser) => void;
 }
 
-// Singleton reCAPTCHA verifier for web — uses a programmatic DOM element
-// so it never depends on React render timing or nativeID availability.
-let _recaptchaVerifier: RecaptchaVerifier | null = null;
-let _recaptchaEl: HTMLDivElement | null = null;
+let recaptchaVerifier: RecaptchaVerifier | null = null;
+let recaptchaElement: HTMLDivElement | null = null;
 
 function getRecaptchaVerifier(): RecaptchaVerifier {
-  if (!_recaptchaVerifier) {
-    if (typeof document !== "undefined") {
-      if (!_recaptchaEl) {
-        _recaptchaEl = document.createElement("div");
-        _recaptchaEl.id = "smovie-recaptcha";
-        document.body.appendChild(_recaptchaEl);
-      }
-      _recaptchaVerifier = new RecaptchaVerifier(
-        firebaseAuth,
-        _recaptchaEl,
-        { size: "invisible", callback: () => {} },
-      );
-    }
+  if (Platform.OS !== "web" || typeof document === "undefined") {
+    throw new Error("Phone authentication is available in the web Firebase flow.");
   }
-  return _recaptchaVerifier!;
-}
 
-function resetRecaptchaVerifier() {
-  try { _recaptchaVerifier?.clear(); } catch {}
-  _recaptchaVerifier = null;
-  // Remove the DOM element from body so the reCAPTCHA badge disappears
-  if (_recaptchaEl && _recaptchaEl.parentNode) {
-    _recaptchaEl.parentNode.removeChild(_recaptchaEl);
+  if (!recaptchaElement) {
+    recaptchaElement = document.createElement("div");
+    recaptchaElement.id = "smovie-phone-recaptcha";
+    document.body.appendChild(recaptchaElement);
   }
-  _recaptchaEl = null;
-}
 
-async function signInWithGoogle(onSuccess: (user: FirebaseUser) => void, setError: (e: string) => void, setLoading: (v: boolean) => void) {
-  if (Platform.OS !== "web") { setError("Google sign-in is only available on web."); return; }
-  setLoading(true);
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(firebaseAuth, provider);
-    const user = result.user;
-    const idToken = await user.getIdToken();
-    onSuccess({
-      uid: user.uid,
-      phoneNumber: user.displayName ?? user.email ?? user.uid,
-      idToken,
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, recaptchaElement, {
+      size: "invisible",
+      callback: () => undefined,
+      "expired-callback": () => {
+        recaptchaVerifier = null;
+      },
     });
-  } catch (e: unknown) {
-    const code = (e as { code?: string })?.code ?? "";
-    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
-    setError(`Google sign-in failed: ${code || String(e)}`);
-  } finally {
-    setLoading(false);
   }
+
+  return recaptchaVerifier;
+}
+
+function resetRecaptcha() {
+  try {
+    recaptchaVerifier?.clear();
+  } catch {
+    // Firebase may already have removed the verifier after an expired token.
+  }
+  recaptchaVerifier = null;
+  if (recaptchaElement?.parentNode) {
+    recaptchaElement.parentNode.removeChild(recaptchaElement);
+  }
+  recaptchaElement = null;
+}
+
+function formatPhoneError(error: unknown): string {
+  const value = error as { code?: string; message?: string };
+  const code = value?.code ?? "";
+  const message = value?.message ?? "";
+
+  if (code === "auth/operation-not-allowed") {
+    return "Phone sign-in is not enabled in Firebase.";
+  }
+  if (code === "auth/invalid-phone-number") {
+    return "Enter a valid 10-digit phone number.";
+  }
+  if (code === "auth/invalid-verification-code") {
+    return "That OTP is incorrect. Please try again.";
+  }
+  if (code === "auth/code-expired") {
+    return "That OTP has expired. Request a new one.";
+  }
+  if (code === "auth/too-many-requests") {
+    return "Too many attempts. Please try again later.";
+  }
+  if (code === "auth/quota-exceeded") {
+    return "SMS quota exceeded. Please try again later.";
+  }
+  if (code === "auth/captcha-check-failed") {
+    return "Security verification failed. Please try again.";
+  }
+  if (code === "auth/network-request-failed") {
+    return "Network error. Please check your connection.";
+  }
+  if (message.toLowerCase().includes("recaptcha")) {
+    return "Security verification failed. Please refresh and try again.";
+  }
+  return message || "Unable to send the OTP. Please try again.";
 }
 
 export default function PhoneAuthModal({ visible, onClose, onSuccess }: Props) {
   const [step, setStep] = useState<Step>("phone");
-  const [countryCode, setCountryCode] = useState("+91");
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [sessionInfo, setSessionInfo] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
-
   const otpRefs = useRef<(TextInput | null)[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -122,264 +123,185 @@ export default function PhoneAuthModal({ visible, onClose, onSuccess }: Props) {
     setResendTimer(60);
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setResendTimer((prev) => {
-        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
-        return prev - 1;
+      setResendTimer((previous) => {
+        if (previous <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+        }
+        return previous - 1;
       });
     }, 1000);
   }, []);
 
-  const handleReset = useCallback(() => {
+  const reset = useCallback(() => {
     setStep("phone");
     setPhoneNumber("");
     setOtp(["", "", "", "", "", ""]);
-    setSessionInfo("");
-    setError("");
+    setConfirmationResult(null);
     setLoading(false);
+    setError("");
     setResendTimer(0);
     if (timerRef.current) clearInterval(timerRef.current);
-    if (Platform.OS === "web") resetRecaptchaVerifier();
+    resetRecaptcha();
   }, []);
 
-  const handleClose = useCallback(() => {
-    handleReset();
+  const close = useCallback(() => {
+    reset();
     onClose();
-  }, [handleReset, onClose]);
+  }, [onClose, reset]);
 
-  const handleSendOtp = useCallback(async () => {
+  const sendOtp = useCallback(async () => {
     const digits = phoneNumber.replace(/\D/g, "");
-    if (digits.length < 7) { setError("Please enter a valid phone number."); return; }
+    if (digits.length !== 10) {
+      setError("Enter a valid 10-digit phone number.");
+      return;
+    }
+    if (!firebaseConfigReady) {
+      setError("Firebase is not configured. Add EXPO_PUBLIC_FIREBASE_API_KEY.");
+      return;
+    }
+    if (Platform.OS !== "web") {
+      setError("Phone authentication is currently available in the web app.");
+      return;
+    }
+
     setError("");
     setLoading(true);
-
-    const fullPhone = `${countryCode}${digits}`;
-
     try {
-      let recaptchaToken: string | undefined;
-
-      if (Platform.OS === "web") {
-        // Get reCAPTCHA token — required by Firebase REST API on web
-        resetRecaptchaVerifier();
-        const verifier = getRecaptchaVerifier();
-        recaptchaToken = await verifier.verify();
-      }
-
-      // ── Both web & native: API server proxy ──────────────────────────────
-      const res = await fetch(`${API_BASE}/api/auth/phone/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: fullPhone, recaptchaToken }),
-      });
-      const data = await res.json() as { sessionInfo?: string; error?: string };
-      if (!res.ok || data.error) {
-        setError(rawError(data.error ?? "Unknown error"));
-        return;
-      }
-      setSessionInfo(data.sessionInfo ?? "");
+      resetRecaptcha();
+      const verifier = getRecaptchaVerifier();
+      const result = await signInWithPhoneNumber(firebaseAuth, `+91${digits}`, verifier);
+      setConfirmationResult(result);
       setStep("otp");
       startResendTimer();
-    } catch (e: unknown) {
-      resetRecaptchaVerifier();
-      // Show the raw Firebase error code for debugging
-      const code = (e as { code?: string })?.code ?? "";
-      const msg  = e instanceof Error ? e.message : String(e);
-      const display = code ? `[${code}] ${msg}` : msg;
-
-      if (code === "auth/operation-not-allowed" || msg.includes("OPERATION_NOT_ALLOWED")) {
-        setError(`Phone auth blocked by Firebase. Code: ${code || "OPERATION_NOT_ALLOWED"}`);
-      } else if (code === "auth/too-many-requests" || msg.includes("TOO_MANY_ATTEMPTS")) {
-        setError("Too many attempts. Please wait and try again in 1 hour.");
-      } else if (code === "auth/quota-exceeded" || msg.includes("QUOTA_EXCEEDED")) {
-        setError("Daily SMS quota exceeded (10/day on free plan). Wait 24h or add billing.");
-      } else if (code === "auth/invalid-phone-number" || msg.includes("INVALID_PHONE_NUMBER")) {
-        setError("Invalid phone number. Example: 9876543210");
-      } else if (code === "auth/network-request-failed") {
-        setError("Network error. Please check your connection.");
-      } else if (code === "auth/captcha-check-failed" || msg.includes("reCAPTCHA")) {
-        setError(`reCAPTCHA failed. Try refreshing the page. [${code}]`);
-      } else {
-        setError(display);
-      }
+    } catch (errorValue) {
+      resetRecaptcha();
+      setError(formatPhoneError(errorValue));
     } finally {
       setLoading(false);
     }
-  }, [phoneNumber, countryCode, startResendTimer]);
+  }, [phoneNumber, startResendTimer]);
 
-  const handleVerifyOtp = useCallback(async () => {
+  const verifyOtp = useCallback(async () => {
     const code = otp.join("");
-    if (code.length < 6) { setError("Please enter the 6-digit OTP."); return; }
+    if (code.length !== 6) {
+      setError("Enter the 6-digit OTP.");
+      return;
+    }
+    if (!confirmationResult) {
+      setError("Your OTP session expired. Request a new one.");
+      return;
+    }
+
     setError("");
     setLoading(true);
-
     try {
-      const res = await fetch(`${API_BASE}/api/auth/phone/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionInfo, code }),
-      });
-      const data = await res.json() as {
-        uid?: string;
-        idToken?: string;
-        phoneNumber?: string;
-        error?: string;
-      };
-      if (!res.ok || data.error) {
-        setError(rawError(data.error ?? "Invalid OTP"));
-        return;
-      }
+      const result = await confirmationResult.confirm(code);
+      const user = result.user;
+      const idToken = await user.getIdToken();
       setStep("success");
       setTimeout(() => {
-        handleReset();
-        onSuccess({ uid: data.uid!, phoneNumber: data.phoneNumber!, idToken: data.idToken! });
-      }, 1200);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+        reset();
+        onSuccess({
+          uid: user.uid,
+          phoneNumber: user.phoneNumber ?? `+91${phoneNumber.replace(/\D/g, "")}`,
+          idToken,
+        });
+      }, 700);
+    } catch (errorValue) {
+      setError(formatPhoneError(errorValue));
     } finally {
       setLoading(false);
     }
-  }, [otp, sessionInfo, handleReset, onSuccess]);
+  }, [confirmationResult, onSuccess, otp, phoneNumber, reset]);
 
   const handleOtpChange = useCallback((value: string, index: number) => {
     const digit = value.replace(/\D/g, "").slice(-1);
-    const next = [...otp];
-    next[index] = digit;
-    setOtp(next);
+    setOtp((previous) => {
+      const next = [...previous];
+      next[index] = digit;
+      return next;
+    });
     if (digit && index < 5) otpRefs.current[index + 1]?.focus();
     if (!digit && index > 0) otpRefs.current[index - 1]?.focus();
-  }, [otp]);
-
-  const handleOtpKeyPress = useCallback((key: string, index: number) => {
-    if (key === "Backspace" && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  }, [otp]);
+  }, []);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <Pressable style={s.backdrop} onPress={handleClose}>
-          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={s.handle} />
-
-            {/* Country picker overlay */}
-            {showCountryPicker && (
-              <View style={s.pickerOverlay}>
-                <View style={s.pickerHeader}>
-                  <Text style={s.pickerTitle}>Country Code</Text>
-                  <Pressable onPress={() => setShowCountryPicker(false)}>
-                    <Feather name="x" size={20} color="#aaa" />
-                  </Pressable>
-                </View>
-                {COUNTRY_CODES.map((c) => (
-                  <Pressable
-                    key={c.code}
-                    style={[s.pickerRow, countryCode === c.code && s.pickerRowSelected]}
-                    onPress={() => { setCountryCode(c.code); setShowCountryPicker(false); }}
-                  >
-                    <Text style={s.pickerFlag}>{c.flag}</Text>
-                    <Text style={s.pickerName}>{c.name}</Text>
-                    <Text style={s.pickerCode}>{c.code}</Text>
-                    {countryCode === c.code && <Feather name="check" size={16} color="#E50914" />}
-                  </Pressable>
-                ))}
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        <KeyboardAwareScrollViewCompat
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={24}
+        >
+          <Pressable style={styles.card} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.header}>
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={step === "otp" ? "keypad-outline" : "phone-portrait-outline"}
+                  size={24}
+                  color="#E50914"
+                />
               </View>
-            )}
+              <Pressable onPress={close} hitSlop={12} accessibilityLabel="Close phone sign-in">
+                <Feather name="x" size={21} color="#737373" />
+              </Pressable>
+            </View>
 
-            {/* ── Step: Phone Entry ── */}
             {step === "phone" && (
               <>
-                <View style={s.iconRow}>
-                  <View style={s.iconWrap}>
-                    <Ionicons name="phone-portrait-outline" size={26} color="#E50914" />
-                  </View>
-                </View>
-                <Text style={s.title}>Sign In with Phone</Text>
-                <Text style={s.subtitle}>We'll send an OTP to your number</Text>
-
-                <View style={s.phoneRow}>
-                  <Pressable style={s.countryBtn} onPress={() => setShowCountryPicker(true)}>
-                    <Text style={s.countryCode}>{countryCode}</Text>
-                    <Feather name="chevron-down" size={14} color="#555" />
-                  </Pressable>
+                <Text style={styles.title}>Sign In with Phone</Text>
+                <Text style={styles.subtitle}>We&apos;ll send a one-time password to your number.</Text>
+                <View style={styles.phoneField}>
                   <TextInput
-                    style={s.phoneInput}
+                    style={styles.countryCode}
+                    value="+91"
+                    editable={false}
+                    accessibilityLabel="Country code"
+                  />
+                  <View style={styles.fieldDivider} />
+                  <TextInput
+                    style={styles.phoneInput}
                     value={phoneNumber}
-                    onChangeText={(t) => { setPhoneNumber(t); setError(""); }}
-                    placeholder="Phone number"
-                    placeholderTextColor="#444"
+                    onChangeText={(value) => {
+                      setPhoneNumber(value.replace(/\D/g, "").slice(0, 10));
+                      setError("");
+                    }}
+                    placeholder="10-digit phone number"
+                    placeholderTextColor="#555"
                     keyboardType="phone-pad"
-                    maxLength={13}
+                    maxLength={10}
                     returnKeyType="done"
-                    onSubmitEditing={handleSendOtp}
+                    onSubmitEditing={sendOtp}
+                    autoFocus
                   />
                 </View>
-
-                {!!error && <Text style={s.errorText}>{error}</Text>}
-
+                {!!error && <Text style={styles.error}>{error}</Text>}
                 <Pressable
-                  style={({ pressed }) => [s.btn, pressed && { opacity: 0.85 }]}
-                  onPress={handleSendOtp}
+                  style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+                  onPress={sendOtp}
                   disabled={loading}
                 >
-                  {loading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.btnText}>Send OTP</Text>}
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Send OTP</Text>}
                 </Pressable>
-
-                <Pressable onPress={handleClose} style={s.cancelBtn}>
-                  <Text style={s.cancelText}>Cancel</Text>
-                </Pressable>
-
-                {Platform.OS === "web" && (
-                  <>
-                    <View style={s.dividerRow}>
-                      <View style={s.dividerLine} />
-                      <Text style={s.dividerText}>ya</Text>
-                      <View style={s.dividerLine} />
-                    </View>
-                    <Pressable
-                      style={({ pressed }) => [s.googleBtn, pressed && { opacity: 0.85 }]}
-                      onPress={() => signInWithGoogle(onSuccess, setError, setLoading)}
-                      disabled={loading}
-                    >
-                      <Text style={s.googleBtnText}>🔵  Google se Sign In karein</Text>
-                    </Pressable>
-                  </>
-                )}
               </>
             )}
 
-            {/* ── Step: OTP Verification ── */}
             {step === "otp" && (
               <>
-                <View style={s.iconRow}>
-                  <View style={s.iconWrap}>
-                    <Ionicons name="keypad-outline" size={26} color="#E50914" />
-                  </View>
-                </View>
-                <Text style={s.title}>Verify OTP</Text>
-                <Text style={s.subtitle}>
-                  OTP sent to {countryCode} {phoneNumber}
-                </Text>
-
-                <View style={s.otpRow}>
-                  {otp.map((digit, i) => (
+                <Text style={styles.title}>Verify OTP</Text>
+                <Text style={styles.subtitle}>Enter the 6-digit code sent to +91 {phoneNumber}.</Text>
+                <View style={styles.otpRow}>
+                  {otp.map((digit, index) => (
                     <TextInput
-                      key={i}
-                      ref={(r) => { otpRefs.current[i] = r; }}
-                      style={[s.otpBox, digit ? s.otpBoxFilled : null]}
+                      key={index}
+                      ref={(input) => {
+                        otpRefs.current[index] = input;
+                      }}
+                      style={[styles.otpBox, digit && styles.otpBoxFilled]}
                       value={digit}
-                      onChangeText={(v) => handleOtpChange(v, i)}
-                      onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, i)}
+                      onChangeText={(value) => handleOtpChange(value, index)}
                       keyboardType="number-pad"
                       maxLength={1}
                       textAlign="center"
@@ -387,266 +309,192 @@ export default function PhoneAuthModal({ visible, onClose, onSuccess }: Props) {
                     />
                   ))}
                 </View>
-
-                {!!error && <Text style={s.errorText}>{error}</Text>}
-
+                {!!error && <Text style={styles.error}>{error}</Text>}
                 <Pressable
-                  style={({ pressed }) => [s.btn, pressed && { opacity: 0.85 }]}
-                  onPress={handleVerifyOtp}
+                  style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+                  onPress={verifyOtp}
                   disabled={loading}
                 >
-                  {loading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.btnText}>Verify OTP</Text>}
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Verify OTP</Text>}
                 </Pressable>
-
-                <View style={s.resendRow}>
+                <View style={styles.resendRow}>
                   {resendTimer > 0 ? (
-                    <Text style={s.resendTimer}>Resend in {resendTimer}s</Text>
+                    <Text style={styles.mutedText}>Resend in {resendTimer}s</Text>
                   ) : (
-                    <Pressable onPress={handleSendOtp}>
-                      <Text style={s.resendLink}>Resend OTP</Text>
+                    <Pressable onPress={sendOtp}>
+                      <Text style={styles.linkText}>Resend OTP</Text>
                     </Pressable>
                   )}
                 </View>
-
-                <Pressable
-                  onPress={() => { setStep("phone"); setOtp(["","","","","",""]); setError(""); }}
-                  style={s.cancelBtn}
-                >
-                  <Text style={s.cancelText}>← Change Number</Text>
+                <Pressable onPress={() => { setStep("phone"); setOtp(["", "", "", "", "", ""]); setError(""); }}>
+                  <Text style={styles.cancelText}>Change number</Text>
                 </Pressable>
               </>
             )}
 
-            {/* ── Step: Success ── */}
             {step === "success" && (
-              <View style={s.successWrap}>
-                <View style={s.successIcon}>
-                  <Ionicons name="checkmark" size={36} color="#fff" />
-                </View>
-                <Text style={s.successTitle}>Logged In! 🎬</Text>
-                <Text style={s.successSub}>Welcome to S-Movie</Text>
+              <View style={styles.success}>
+                <Ionicons name="checkmark-circle" size={62} color="#34D399" />
+                <Text style={styles.successTitle}>You&apos;re signed in</Text>
+                <Text style={styles.subtitle}>Welcome to S MOVIE ORIGINAL.</Text>
               </View>
             )}
           </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollViewCompat>
+      </View>
     </Modal>
   );
 }
 
-function rawError(raw: string): string {
-  return raw; // Show the raw Firebase error as-is for debugging
-}
-
-function friendlyError(raw: string): string {
-  const r = raw.toLowerCase();
-  if (r.includes("operation_not_allowed") || r.includes("operation-not-allowed"))
-    return "Phone sign-in is not enabled. Please contact support.";
-  if (r.includes("too_many_attempts") || r.includes("too-many-requests"))
-    return "Too many attempts. Please wait and try again in 1 hour.";
-  if (r.includes("invalid_code") || r.includes("invalid-verification-code"))
-    return "Incorrect OTP. Please check and try again.";
-  if (r.includes("session_expired") || r.includes("code-expired"))
-    return "OTP has expired. Please request a new one.";
-  if (r.includes("invalid_phone_number") || r.includes("invalid-phone-number"))
-    return "Invalid phone number format. Example: 9876543210";
-  if (r.includes("invalid_session_info"))
-    return "Session expired. Please request a new OTP.";
-  if (r.includes("quota_exceeded"))
-    return "SMS quota exceeded. Please try again tomorrow.";
-  if (r.includes("network"))
-    return "Network error. Please check your connection.";
-  return "Something went wrong. Please try again.";
-}
-
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.82)",
   },
-  sheet: {
-    backgroundColor: "#0f0f0f",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: "#222",
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 8,
-    minHeight: 360,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 28,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#2a2a2a",
+  card: {
+    width: "100%",
+    maxWidth: 420,
     alignSelf: "center",
-    marginBottom: 24,
+    backgroundColor: "#141414",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    padding: 22,
   },
-  iconRow: { alignItems: "center", marginBottom: 14 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+  },
   iconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 48,
+    height: 48,
+    borderRadius: 15,
     backgroundColor: "rgba(229,9,20,0.12)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(229,9,20,0.2)",
   },
   title: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 21,
     fontFamily: "Inter_700Bold",
-    textAlign: "center",
     marginBottom: 6,
   },
   subtitle: {
-    color: "#555",
+    color: "#737373",
     fontSize: 13,
+    lineHeight: 19,
     fontFamily: "Inter_400Regular",
-    textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
-
-  phoneRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
-  countryBtn: {
+  phoneField: {
+    height: 52,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#2a2a2a",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    minWidth: 72,
+    marginBottom: 12,
   },
   countryCode: {
-    color: "#e5e5e5",
+    width: 62,
+    color: "#fff",
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+  },
+  fieldDivider: {
+    height: 26,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: "#3a3a3a",
   },
   phoneInput: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#2a2a2a",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     color: "#fff",
-    fontSize: 16,
-    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    paddingHorizontal: 14,
   },
-
+  error: {
+    color: "#ff6b73",
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 10,
+  },
+  primaryButton: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: "#E50914",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  primaryText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  pressed: {
+    opacity: 0.78,
+  },
   otpRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 10,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 12,
   },
   otpBox: {
-    width: 44,
+    width: 43,
     height: 52,
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#2a2a2a",
     backgroundColor: "#1a1a1a",
     color: "#fff",
-    fontSize: 22,
+    fontSize: 21,
     fontFamily: "Inter_700Bold",
-    textAlign: "center",
   },
   otpBoxFilled: {
     borderColor: "#E50914",
     backgroundColor: "rgba(229,9,20,0.08)",
   },
-
-  errorText: {
-    color: "#E50914",
+  resendRow: {
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  mutedText: {
+    color: "#555",
     fontSize: 12,
     fontFamily: "Inter_400Regular",
+  },
+  linkText: {
+    color: "#E50914",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  cancelText: {
+    color: "#737373",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
     textAlign: "center",
-    marginBottom: 10,
-    lineHeight: 18,
   },
-
-  btn: {
-    backgroundColor: "#E50914",
-    borderRadius: 12,
-    paddingVertical: 15,
+  success: {
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  btnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-
-  cancelBtn: { paddingVertical: 12, alignItems: "center" },
-  cancelText: { color: "#555", fontSize: 13, fontFamily: "Inter_400Regular" },
-  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#2a2a2a" },
-  dividerText: { color: "#555", fontSize: 12, marginHorizontal: 10, fontFamily: "Inter_400Regular" },
-  googleBtn: {
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-  },
-  googleBtnText: { color: "#ccc", fontSize: 14, fontFamily: "Inter_500Medium" },
-
-  resendRow: { alignItems: "center", paddingVertical: 8 },
-  resendTimer: { color: "#555", fontSize: 12, fontFamily: "Inter_400Regular" },
-  resendLink: { color: "#E50914", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-
-  successWrap: { alignItems: "center", paddingVertical: 32, gap: 14 },
-  successIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#22c55e",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  successTitle: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold" },
-  successSub: { color: "#555", fontSize: 14, fontFamily: "Inter_400Regular" },
-
-  pickerOverlay: {
-    position: "absolute",
-    top: 20,
-    left: 0,
-    right: 0,
-    backgroundColor: "#141414",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#222",
-    zIndex: 100,
-    overflow: "hidden",
-  },
-  pickerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#222",
-  },
-  pickerTitle: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-  pickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    paddingVertical: 22,
     gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
   },
-  pickerRowSelected: { backgroundColor: "rgba(229,9,20,0.06)" },
-  pickerFlag: { fontSize: 20 },
-  pickerName: { flex: 1, color: "#e5e5e5", fontSize: 14, fontFamily: "Inter_500Medium" },
-  pickerCode: { color: "#555", fontSize: 13, fontFamily: "Inter_400Regular", marginRight: 8 },
+  successTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
 });

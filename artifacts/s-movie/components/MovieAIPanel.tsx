@@ -75,7 +75,7 @@ async function fetchAIPanelData(
       ? `The user recently watched: ${recentTitles.slice(0, 5).join(", ")}.`
       : "";
 
-  const prompt = `You are an expert film critic and recommendation engine for S-MOVIE, a premium Indian streaming app.
+  const prompt = `You are an expert film critic and recommendation engine for S MOVIE ORIGINAL, a premium Indian streaming app.
 
 Title: "${title}" (${year ?? "N/A"}, ${mediaType === "tv" ? "TV Series" : "Film"})
 Genres: ${genres.length > 0 ? genres.join(", ") : "Unknown"}

@@ -53,7 +53,7 @@ export default function NotificationSettingsScreen() {
         // Already denied — send user to system settings
         Alert.alert(
           "Permission Denied",
-          "To enable notifications, go to your phone's Settings → Apps → S-Movie Original → Notifications and turn them on.",
+          "To enable notifications, go to your phone's Settings → Apps → S MOVIE ORIGINAL → Notifications and turn them on.",
           [
             { text: "Cancel", style: "cancel" },
             { text: "Open Settings", onPress: () => Linking.openSettings() },
@@ -148,7 +148,7 @@ export default function NotificationSettingsScreen() {
                     {isGranted
                       ? "You'll receive alerts about new trending movies & series."
                       : isDenied
-                      ? "Open Settings to allow S-Movie Original to send notifications."
+                      ? "Open Settings to allow S MOVIE ORIGINAL to send notifications."
                       : "Tap below to allow notifications."}
                   </Text>
                 </View>

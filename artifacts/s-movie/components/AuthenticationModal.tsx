@@ -13,9 +13,14 @@ export interface AuthenticationModalProps {
   onClose: () => void;
   onGooglePress?: () => void;
   onPhonePress?: () => void;
-  onSignIn?: (credentials: { email: string; password: string }) => void;
-  onForgotPassword?: (email: string) => void;
-  onCreateAccount?: (account: { name: string; email: string; password: string }) => void;
+  onSignIn?: (credentials: { email: string; password: string }) => void | Promise<void>;
+  onForgotPassword?: (email: string) => void | Promise<void>;
+  onCreateAccount?: (account: {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  }) => void | Promise<void>;
 }
 
 export default function AuthenticationModal({
@@ -56,7 +61,12 @@ export default function AuthenticationModal({
       onSignIn?.({ email: email.trim(), password });
       return;
     }
-    onCreateAccount?.({ name: name.trim(), email: email.trim(), password });
+    onCreateAccount?.({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      confirmPassword,
+    });
   };
 
   const handleForgotPassword = () => {
@@ -124,8 +134,8 @@ export default function AuthenticationModal({
             </Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
               {mode === "login"
-                ? "Sign in to continue watching on S-Movie"
-                : "Join S-Movie and keep your watchlist in sync"}
+                ? "Sign in to continue watching on S MOVIE ORIGINAL"
+                : "Join S MOVIE ORIGINAL and keep your watchlist in sync"}
             </Text>
 
             {mode === "login" && (
@@ -264,7 +274,7 @@ export default function AuthenticationModal({
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                {mode === "login" ? "New to S-Movie?" : "Already have an account?"}
+                {mode === "login" ? "New to S MOVIE ORIGINAL?" : "Already have an account?"}
               </Text>
               <Pressable
                 accessibilityRole="button"
