@@ -41,6 +41,7 @@ import {
   tmdbGet,
   tmdbImg,
   tmdbToCard,
+  fetchDetailPosterUri,
   type TMDBCastMember,
   type TMDBDetail,
   type TMDBEpisode,
@@ -409,7 +410,11 @@ export default function MovieDetail() {
           if (cancelled) return;
           const poster_path = detail.poster_path;
           const backdrop_path = detail.backdrop_path;
-          const posterUri = tmdbImg(poster_path, "w780");
+          // Detail-page poster: uses images[1] (getDetailPoster logic) so the
+          // detail screen shows DIFFERENT artwork than the home screen (which
+          // uses rotation_key-based selection from the same pool).
+          const detailPosterUri = await fetchDetailPosterUri(numericTmdbId, type, poster_path).catch(() => null);
+          const posterUri = detailPosterUri ?? tmdbImg(poster_path, "w780");
           const heroUri = tmdbImg(backdrop_path, "original");
           const title = detail.title ?? detail.name ?? "Untitled";
           const year = parseInt(

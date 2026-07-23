@@ -128,8 +128,8 @@ export async function fetchMoviePosters(
       if (bHasText !== aHasText) return bHasText - aHasText;
       return (b.vote_average ?? 0) - (a.vote_average ?? 0);
     });
-    // Keep up to 15 entries; text-logo ones will dominate the top of the list.
-    const paths = sorted.slice(0, 15).map((p) => p.file_path);
+    // Keep up to 50 entries for a rich rotation pool (Netflix-style 50-poster algorithm).
+    const paths = sorted.slice(0, 50).map((p) => p.file_path);
     _posterCache.set(cacheKey, paths);
     return paths;
   } catch {
@@ -141,8 +141,9 @@ export async function fetchMoviePosters(
 /**
  * Netflix-style dynamic poster: picks from the top text-logo posters returned
  * by fetchMoviePosters (which sorts en/hi language posters before textless ones).
- * Sampling is limited to the first 5 entries so we stay within the text-logo
- * tier and never accidentally surface a plain textless artwork.
+ * Uses a 15-hour rotation_key so the same title shows different artwork across
+ * visits without flickering mid-session. tmdbId provides per-title entropy so
+ * concurrent titles don't all land on the same poster index.
  * Falls back to `fallbackPath` when no alternatives exist.
  * Returns a fully-proxied image URI at original resolution.
  */
@@ -153,9 +154,30 @@ export async function fetchRandomPosterUri(
 ): Promise<string | null> {
   const posters = await fetchMoviePosters(tmdbId, mediaType);
   if (posters.length > 0) {
-    // Cap the random pool to the top 5 so text-logo art is always preferred.
-    const pool = posters.slice(0, Math.min(5, posters.length));
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    // Use rotation_key (15-hour window) + tmdbId entropy for deterministic
+    // but varied selection — no Math.random() so the poster stays stable
+    // throughout a browsing session and only rotates every 15 hours.
+    const rotationKey = Math.floor(Date.now() / (15 * 60 * 60 * 1000));
+    const pool = posters.slice(0, Math.min(50, posters.length));
+    const idx  = Math.abs(rotationKey * 31 + tmdbId) % pool.length;
+    return tmdbOriginal(pool[idx]);
+  }
+  return tmdbOriginal(fallbackPath);
+}
+
+/**
+ * Returns the detail-page poster path (images[1]) so the detail screen shows
+ * different artwork than the home screen (which uses rotation_key-based index).
+ * Falls back to images[0] when only one poster exists.
+ */
+export async function fetchDetailPosterUri(
+  tmdbId: number,
+  mediaType: "movie" | "tv",
+  fallbackPath: string | null | undefined,
+): Promise<string | null> {
+  const posters = await fetchMoviePosters(tmdbId, mediaType);
+  if (posters.length > 0) {
+    const pick = posters.length > 1 ? posters[1] : posters[0];
     return tmdbOriginal(pick);
   }
   return tmdbOriginal(fallbackPath);
@@ -1593,9 +1615,79 @@ export const tmdb = {
       page,
     }),
 
-  /** Top 10 Shows in All Country Today — global daily trending TV, no region filter. */
+  /** Top 10 Shows in All Country Today — Netflix TV globally, sorted by popularity. */
   top10ShowsAllCountries: (page = 1): Promise<TMDBPage> =>
-    get<TMDBPage>("/trending/tv/day", { page }),
+    get<TMDBPage>("/discover/tv", { with_networks: 213, sort_by: "popularity.desc", "first_air_date.lte": TODAY, page }),
+
+  // ─── Netflix-Only Generic Fetchers (with_networks=213 / watch_provider=8) ────
+  // These replace the open-catalog fetchers in categoryMap.ts so every row
+  // exclusively shows Netflix content, as specified by the permanent algorithm.
+
+  /**
+   * Generic Netflix TV discover — with_networks=213 plus any extra params.
+   * Usage: tmdb.netflixTV({ with_genres: "10749,18" })(page)
+   */
+  netflixTV: (extra: Record<string, string | number> = {}) =>
+    (page = 1): Promise<TMDBPage> =>
+      get<TMDBPage>("/discover/tv", {
+        with_networks: 213,
+        sort_by: "popularity.desc",
+        "first_air_date.lte": TODAY,
+        "vote_count.gte": 5,
+        ...extra,
+        page,
+      }),
+
+  /**
+   * Generic Netflix Movie discover — with_watch_providers=8 (Netflix) plus extra params.
+   * Usage: tmdb.netflixMovie({ with_genres: 28 })(page)
+   */
+  netflixMovie: (extra: Record<string, string | number> = {}) =>
+    (page = 1): Promise<TMDBPage> =>
+      get<TMDBPage>("/discover/movie", {
+        with_watch_providers: 8,
+        watch_region: "IN",
+        sort_by: "popularity.desc",
+        "primary_release_date.lte": TODAY,
+        "vote_count.gte": 5,
+        ...extra,
+        page,
+      }),
+
+  /**
+   * Netflix New Releases — combines newest Netflix TV series + movies sorted by
+   * release date descending. Used exclusively for the Hero Banner so it always
+   * shows the freshest Netflix content with the 15-hour poster rotation.
+   */
+  netflixNewReleasesAll: async (page = 1): Promise<TMDBPage> => {
+    const [tv, movies] = await Promise.all([
+      get<TMDBPage>("/discover/tv", {
+        with_networks: 213,
+        sort_by: "first_air_date.desc",
+        "first_air_date.lte": TODAY,
+        "vote_count.gte": 5,
+        page,
+      }),
+      get<TMDBPage>("/discover/movie", {
+        with_watch_providers: 8,
+        watch_region: "IN",
+        sort_by: "primary_release_date.desc",
+        "primary_release_date.lte": TODAY,
+        "vote_count.gte": 5,
+        page,
+      }),
+    ]);
+    const tvR     = (tv.results    ?? []).map((m) => ({ ...m, media_type: "tv"    }));
+    const movieR  = (movies.results ?? []).map((m) => ({ ...m, media_type: "movie" }));
+    const merged  = [...tvR, ...movieR].sort((a, b) => {
+      const aD = a.first_air_date ?? (a as any).release_date ?? "";
+      const bD = b.first_air_date ?? (b as any).release_date ?? "";
+      return bD.localeCompare(aD);
+    });
+    const seen = new Set<number>();
+    const unique = merged.filter((m) => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
+    return { ...tv, results: unique.slice(0, 40) };
+  },
 
   /**
    * TV Recommendations factory — returns a standard (page) fetcher bound to a

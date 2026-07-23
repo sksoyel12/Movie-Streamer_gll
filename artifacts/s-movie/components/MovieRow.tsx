@@ -13,6 +13,9 @@ import {
 
 import { saveHomeCache, loadHomeCache } from "@/lib/homeCache";
 import { prefetchStream } from "@/lib/backgroundPrefetch";
+import { getLockedHomePosterUri } from "@/lib/posterAlgorithm";
+import { scoreAndSortByGemini } from "@/lib/geminiScore";
+import { fetchMoviePosters, tmdbOriginal } from "@/lib/tmdb";
 
 // Splits "👍 Some Title" → { emoji: "👍 ", text: "Some Title" }
 // Needed because Inter font has no emoji glyphs — emoji must render in system font.
@@ -209,6 +212,12 @@ interface Props {
   // before being stored in state, so the row order always reflects real-time
   // TMDB engagement data without any manual intervention.
   sortByPopularity?: boolean;
+  /**
+   * When set, Gemini AI scores each item in this row after initial load and
+   * re-sorts it by personalised engagement score (0-100). Set to a stable
+   * string label (e.g. "trending", "becauseYouLiked") to enable AI sorting.
+   */
+  geminiRowId?: string;
 }
 
 
@@ -378,19 +387,35 @@ const RowCard = React.memo(function RowCard({
   const mediaType: "movie" | "tv" =
     (m as any).mediaType ?? (title.toLowerCase().includes("shows") ? "tv" : "movie");
 
-  // Task 3: Netflix-style Dynamic Artwork — fetch a random alternative poster from
-  // TMDB's /images pool and swap it in once resolved. The in-memory cache in
-  // lib/tmdb.ts means each title is only fetched once per session (no 429 risk).
+  // Netflix-style Dynamic Artwork with 15-hour locked poster rotation:
+  // 1. Fetch the full TMDB /images pool (up to 50 posters per title).
+  // 2. Use getLockedHomePosterUri — selects a poster deterministically via
+  //    rotation_key (= Math.floor(Date.now() / 15h)) and caches it in
+  //    AsyncStorage so the SAME poster is shown throughout the browsing session.
+  //    The poster only changes when the 15-hour window advances (no flicker).
+  // 3. The in-memory poster pool cache in lib/tmdb.ts means /images is fetched
+  //    only once per title per session (no 429 risk even across 90 rows).
   const [dynamicUri, setDynamicUri] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!tmdbId) return;
     let cancelled = false;
-    const posterPath = (m as any).poster_path as string | null | undefined;
-    fetchRandomPosterUri(tmdbId, mediaType, posterPath).then((uri) => {
-      if (!cancelled && uri) setDynamicUri(uri);
-    }).catch(() => {});
+    (async () => {
+      try {
+        const posters = await fetchMoviePosters(tmdbId, mediaType);
+        if (cancelled) return;
+        const posterPath = (m as any).poster_path as string | null | undefined;
+        const fallbackUri = posterPath ? (tmdbOriginal(posterPath) ?? undefined) : undefined;
+        const uri = await getLockedHomePosterUri(
+          tmdbId,
+          posters,
+          (path) => tmdbOriginal(path),
+          fallbackUri ?? null,
+        );
+        if (!cancelled && uri) setDynamicUri(uri);
+      } catch {}
+    })();
     return () => { cancelled = true; };
-  // refreshKey causes the row to re-shuffle; tmdbId/mediaType identify the card
+  // refreshKey is the intentional re-fetch trigger; tmdbId/mediaType identify the card.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tmdbId, mediaType, refreshKey]);
 
@@ -493,6 +518,7 @@ export default function MovieRow({
   seenIds,
   imageMode = "poster",
   sortByPopularity = false,
+  geminiRowId,
 }: Props) {
   const [movies, setMovies] = useState<CardItem[]>(initialMovies);
   const [initialLoading, setInitialLoading] = useState(Boolean(tmdbFetcher || hdhubFetcher));
@@ -622,6 +648,14 @@ export default function MovieRow({
             setHasMore(dedupPage < lastPageData.total_pages);
             prefetchImages(toShow.slice(0, 16).map((c) => (c.poster as { uri?: string })?.uri));
             saveHomeCache(title, toShow).catch(() => {});
+            // Gemini AI re-sort: for designated rows (Trending, Because you liked),
+            // score each item and re-sort by personalised engagement score.
+            // Fire-and-forget — never blocks the initial render.
+            if (geminiRowId) {
+              scoreAndSortByGemini(toShow as any[], geminiRowId).then((sorted) => {
+                if (!cancelled && mountedRef.current) setMovies(sorted as CardItem[]);
+              }).catch(() => {});
+            }
           } else {
             // No results at all (API returned empty page) — keep previous
             setMovies((prev) => (prev.length > 0 ? prev : initialMovies));

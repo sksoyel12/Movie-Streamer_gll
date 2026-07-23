@@ -20,11 +20,11 @@ import { type Movie } from "@/data/movies";
 import {
   tmdb,
   tmdbToCard,
-  fetchRandomPosterUri,
+  fetchMoviePosters,
+  tmdbOriginal,
   clearPosterCache,
-  dailyRotationIndex,
-  rotateArray,
 } from "@/lib/tmdb";
+import { getLockedHomePosterUri, clearExpiredPosterLocks } from "@/lib/posterAlgorithm";
 import { HOME_CATEGORIES } from "@/lib/categoryMap";
 import { hasUnread as checkHasUnread } from "@/lib/notificationPrefs";
 import { saveHomeCacheTTL, loadHomeCacheTTL, loadHomeCache, HERO_CACHE_KEY } from "@/lib/homeCache";
@@ -112,60 +112,36 @@ export default function HomeScreen() {
   // title never appears twice across the ~50 category rows below the hero.
   const seenIds = useRef<Set<string>>(new Set());
 
-  // ── Real-time hero fetch — daily-rotating Movie / K-Drama / US Show mix ─────
-  // Netflix-style hero rotation: pull today's #1 trending item from three
-  // distinct pools (Movies, K-Dramas, US TV Shows) so the banner always has
-  // variety across content types, and use a date-seeded rotation offset per
-  // pool so the *order* those pools lead with changes once every 24 hours
-  // (stable all day, shifts forward the next day) rather than reshuffling on
-  // every single open/refresh.
+  // ── Hero Banner: Netflix New Releases Algorithm ──────────────────────────────
+  // Content: ONLY Netflix New Releases (with_networks=213), sorted by release
+  // date descending so the freshest titles always lead the banner.
+  //
+  // Poster Rotation:
+  //   rotation_key = Math.floor(Date.now() / (15 * 60 * 60 * 1000))
+  //   For each title, rotation_key selects one poster from the 50-poster TMDB
+  //   pool. The key advances every 15 hours so the same title shows different
+  //   artwork across sessions without flickering mid-browse.
+  //
+  // Consistency:
+  //   Once a poster is selected for a session, getLockedHomePosterUri stores it
+  //   in AsyncStorage keyed by movieId. On re-open within the same 15-hour window,
+  //   the exact same URI is returned — no flicker.
   const fetchHero = useCallback(async () => {
     try {
-      const [movieRes, kdramaRes, usShowRes, netflixRes] = await Promise.allSettled([
-        tmdb.trendingMoviesDay(1),  // /trending/movie/day — today's #1 movie pool
-        tmdb.koreanDramas(1),       // KR origin + drama genre, sorted by live popularity
-        tmdb.usTVShows(1),          // US origin TV, sorted by live popularity
-        tmdb.netflixOriginals(1),   // Task 4: Netflix originals pool for hero banner
-      ]);
-
-      const moviesRaw   = movieRes.status   === "fulfilled" ? (movieRes.value.results   ?? []).map((m) => ({ ...m, media_type: "movie" })) : [];
-      const kdramaRaw   = kdramaRes.status  === "fulfilled" ? (kdramaRes.value.results  ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
-      const usShowRaw   = usShowRes.status  === "fulfilled" ? (usShowRes.value.results  ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
-      const netflixRaw  = netflixRes.status === "fulfilled" ? (netflixRes.value.results ?? []).map((m) => ({ ...m, media_type: "tv" }))    : [];
-
-      // Each pool is rotated by a seed that changes at midnight, so which
-      // title from that pool leads changes daily — the underlying pool data
-      // itself already updates live from TMDB every fetch.
-      const pools = [
-        rotateArray(moviesRaw,  dailyRotationIndex(moviesRaw.length,  1)),
-        rotateArray(kdramaRaw,  dailyRotationIndex(kdramaRaw.length,  2)),
-        rotateArray(usShowRaw,  dailyRotationIndex(usShowRaw.length,  3)),
-        rotateArray(netflixRaw, dailyRotationIndex(netflixRaw.length, 4)),
-      ];
-
-      // Rotate which pool leads the banner today (Movie/K-Drama/US Show/Netflix cycle).
-      const leadOffset = dailyRotationIndex(pools.length, 0);
-      const orderedPools = rotateArray(pools, leadOffset);
-
-      // Interleave Movie → K-Drama → US Show → repeat, so the banner always
-      // cycles through content types rather than clustering one type first.
-      const interleaved: any[] = [];
-      const maxLen = Math.max(...orderedPools.map((p) => p.length));
-      for (let i = 0; i < maxLen; i++) {
-        for (const pool of orderedPools) {
-          if (i < pool.length) interleaved.push(pool[i]);
-        }
-      }
+      // Netflix New Releases: merged TV + Movie from Netflix (network 213),
+      // ordered by release date desc so the freshest content leads.
+      const netflixRes = await tmdb.netflixNewReleasesAll(1);
+      const raw = (netflixRes.results ?? []);
 
       const seen = new Set<number>();
-      const qualified = interleaved.filter((m) => {
+      const qualified = raw.filter((m) => {
         if (m.id === 155) return false;
         const t = (m.title ?? m.name ?? "").toLowerCase();
         if (t.includes("dark knight")) return false;
         if (!m.backdrop_path || !m.poster_path) return false;
         if (seen.has(m.id)) return false;
         if (!m.overview || m.overview.length < 20) return false;
-        if ((m.vote_count ?? 0) < 50) return false;
+        if ((m.vote_count ?? 0) < 5) return false;
         if (m.media_type !== "movie" && m.media_type !== "tv") return false;
         seen.add(m.id);
         return true;
@@ -174,32 +150,42 @@ export default function HomeScreen() {
       const baseCards = qualified.slice(0, 10).map((m) => toMovieCard(tmdbToCard(m)));
       if (baseCards.length === 0) return;
 
-      // Multi-Asset Rotation: swap in a randomly-selected alt poster/backdrop
-      // from TMDB's /images pool for each item so the same title looks fresh
-      // across visits instead of always showing the exact same artwork.
+      // Poster Rotation Algorithm:
+      // For each hero card, fetch the TMDB /images pool (up to 50 posters) and
+      // use getLockedHomePosterUri to deterministically select + lock a poster
+      // for the current 15-hour rotation window. This ensures:
+      //   1. No flicker — same poster throughout a browsing session
+      //   2. Variety across sessions — poster changes every 15 hours
+      //   3. Per-title uniqueness — different titles show different posters
       const enriched = await Promise.allSettled(
         baseCards.map(async (card) => {
-          const id = (card as any).tmdbId;
-          if (!id || typeof id !== "number") return card;
+          const tmdbId = (card as any).tmdbId as number | undefined;
+          if (!tmdbId) return card;
           const mediaType: "movie" | "tv" = (card as any).mediaType ?? "movie";
-          const uri = await fetchRandomPosterUri(id, mediaType, null);
+          const posters = await fetchMoviePosters(tmdbId, mediaType);
+          const uri = await getLockedHomePosterUri(
+            tmdbId,
+            posters,
+            (path) => tmdbOriginal(path),
+          );
           return uri ? ({ ...card, poster: { uri } } as Movie) : card;
         }),
       );
 
       const heroResult = enriched.map((r, i) => (r.status === "fulfilled" ? r.value : baseCards[i]));
       setHeroMovies(heroResult);
-      // Persist hero with 24-hour TTL — banner only re-fetches once per day,
-      // not on every app open. Cached result loads instantly on next visit.
+      // Persist hero with 24-hour TTL so it loads instantly on next app open.
       saveHomeCacheTTL(HERO_CACHE_KEY, heroResult).catch(() => {});
     } catch {
       // keep current state on error
     }
   }, []);
 
-  // On tab focus: load cached hero first for instant display, then refresh
+  // On tab focus: load cached hero first for instant display, then refresh.
+  // Also run the 24-hour poster-lock purge (fire-and-forget) to keep storage lean.
   useFocusEffect(
     useCallback(() => {
+      clearExpiredPosterLocks().catch(() => {});
       checkHasUnread(LATEST_NOTIF_AT).then(setHasUnreadNotifs);
       // Show cached hero immediately; re-fetch only when cache is older than 24 h
       loadHomeCacheTTL<Movie[]>(HERO_CACHE_KEY, 24 * 60 * 60 * 1000).then((fresh) => {
@@ -344,6 +330,13 @@ export default function HomeScreen() {
             );
           }
 
+          // Gemini AI re-sorts Trending and "Because you liked" rows by
+          // personalised engagement score after initial data loads.
+          const geminiRowId =
+            cat.title === "Trending Now" ? "trending" :
+            cat.title === "Because you liked" ? "becauseYouLiked" :
+            undefined;
+
           return (
             <React.Fragment key={cat.title}>
               {personalRow}
@@ -355,6 +348,7 @@ export default function HomeScreen() {
                 seenIds={seenIds}
                 refreshKey={rowRefreshKey}
                 imageMode={cat.imageMode}
+                geminiRowId={geminiRowId}
               />
             </React.Fragment>
           );
