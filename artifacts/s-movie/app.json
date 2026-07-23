@@ -72,7 +72,7 @@
       [
         "expo-updates",
         {
-          "launchWaitMs": 3000
+          "launchWaitMs": 0
         }
       ],
       [
