@@ -1,5 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { firebaseAuth } from "@/lib/firebase";
+import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
@@ -169,6 +170,7 @@ export default function AIChatbotModal({ visible, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   // Web-only hidden file input
   const webFileInputRef = useRef<WebFileInput>(null);
@@ -479,9 +481,22 @@ export default function AIChatbotModal({ visible, onClose }: Props) {
     onClose();
   }, [onClose, stopVoice]);
 
+  const copyMessage = useCallback(async (message: Message) => {
+    if (!message.text) return;
+    await Clipboard.setStringAsync(message.text);
+    setCopiedMessageId(message.id);
+    setTimeout(() => {
+      setCopiedMessageId((currentId) =>
+        currentId === message.id ? null : currentId,
+      );
+    }, 1600);
+  }, []);
+
   const renderMessage = useCallback(({ item }: { item: Message }) => {
     const isUser = item.role === "user";
     const att = item.attachment;
+    const canCopy = !att && Boolean(item.text);
+    const isCopied = copiedMessageId === item.id;
 
     return (
       <View
@@ -495,62 +510,91 @@ export default function AIChatbotModal({ visible, onClose }: Props) {
             <Text style={styles.botAvatarText}>S</Text>
           </View>
         )}
-        <View
-          style={[
-            styles.bubble,
-            isUser ? styles.bubbleUser : styles.bubbleBot,
-            att?.type === "image" && styles.bubbleImageless,
-          ]}
-        >
-          {att ? (
-            att.type === "image" ? (
-              <Image
-                source={{ uri: att.localUri }}
-                style={styles.attachImage}
-                resizeMode="cover"
-              />
-            ) : att.type === "video" ? (
-              <View style={styles.filePill}>
-                <Ionicons name="videocam" size={20} color="#fff" />
-                <Text
-                  style={[styles.bubbleText, styles.bubbleTextUser]}
-                  numberOfLines={2}
-                >
-                  {att.name}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.filePill}>
-                <Ionicons
-                  name="document-text"
-                  size={20}
-                  color={isUser ? "#fff" : "#bbb"}
+        <View>
+          <View
+            style={[
+              styles.bubble,
+              isUser ? styles.bubbleUser : styles.bubbleBot,
+              att?.type === "image" && styles.bubbleImageless,
+            ]}
+          >
+            {att ? (
+              att.type === "image" ? (
+                <Image
+                  source={{ uri: att.localUri }}
+                  style={styles.attachImage}
+                  resizeMode="cover"
                 />
-                <Text
-                  style={[
-                    styles.bubbleText,
-                    isUser ? styles.bubbleTextUser : styles.bubbleTextBot,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {att.name}
-                </Text>
-              </View>
-            )
-          ) : (
-            <Text
-              style={[
-                styles.bubbleText,
-                isUser ? styles.bubbleTextUser : styles.bubbleTextBot,
+              ) : att.type === "video" ? (
+                <View style={styles.filePill}>
+                  <Ionicons name="videocam" size={20} color="#fff" />
+                  <Text
+                    style={[styles.bubbleText, styles.bubbleTextUser]}
+                    numberOfLines={2}
+                  >
+                    {att.name}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.filePill}>
+                  <Ionicons
+                    name="document-text"
+                    size={20}
+                    color={isUser ? "#fff" : "#bbb"}
+                  />
+                  <Text
+                    style={[
+                      styles.bubbleText,
+                      isUser ? styles.bubbleTextUser : styles.bubbleTextBot,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {att.name}
+                  </Text>
+                </View>
+              )
+            ) : (
+              <Text
+                style={[
+                  styles.bubbleText,
+                  isUser ? styles.bubbleTextUser : styles.bubbleTextBot,
+                ]}
+              >
+                {item.text}
+              </Text>
+            )}
+          </View>
+          {canCopy && (
+            <Pressable
+              accessibilityLabel={isCopied ? "Copied" : "Copy message"}
+              accessibilityRole="button"
+              hitSlop={6}
+              onPress={() => copyMessage(item)}
+              style={({ pressed }) => [
+                styles.copyMessageBtn,
+                isUser && styles.copyMessageBtnUser,
+                pressed && { opacity: 0.65 },
               ]}
             >
-              {item.text}
-            </Text>
+              <Feather
+                name={isCopied ? "check" : "copy"}
+                size={12}
+                color={isCopied ? "#22c55e" : isUser ? "#777" : "#666"}
+              />
+              <Text
+                style={[
+                  styles.copyMessageText,
+                  isCopied && styles.copyMessageTextCopied,
+                ]}
+              >
+                {isCopied ? "Copied" : "Copy"}
+              </Text>
+            </Pressable>
           )}
         </View>
       </View>
     );
-  }, []);
+  }, [copiedMessageId, copyMessage]);
 
   return (
     <Modal
@@ -910,6 +954,22 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 14, lineHeight: 20 },
   bubbleTextUser: { color: "#fff", fontFamily: "Inter_400Regular" },
   bubbleTextBot: { color: "#e5e5e5", fontFamily: "Inter_400Regular" },
+  copyMessageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    marginTop: 2,
+  },
+  copyMessageBtnUser: { alignSelf: "flex-end" },
+  copyMessageText: {
+    color: "#666",
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  copyMessageTextCopied: { color: "#22c55e" },
 
   attachImage: { width: 200, height: 160, borderRadius: 14 },
   filePill: {
