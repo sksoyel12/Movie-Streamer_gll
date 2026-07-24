@@ -13,12 +13,17 @@ This project has 4 artifacts, each with its own workflow (already running in dev
 
 Other useful commands:
 - Fresh import bootstrap: `pnpm install --frozen-lockfile`
+- `pnpm run setup:check` — verify the imported workspace and report whether the Gemini secret is configured (without printing it)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 
 Env already configured: `DATABASE_URL` (Postgres), plus TMDB/YouTube API keys and source URLs in `.replit` `[userenv.shared]`.
+
+For the mobile AI features, add `GEMINI_API_KEY` through Replit Secrets. The Expo workflow passes that secret into the app as `EXPO_PUBLIC_GEMINI_API_KEY`; never commit the key or paste it into source files or chat. If it is absent, the app keeps its non-AI browsing features available and hides the AI panels.
+
+After a fresh import, run `pnpm install --frozen-lockfile`, then use the managed workflows for the four artifacts. The browser-visible download page is at `/smovie-download/`; the Expo app is native-focused and is intended for Expo Go or Android builds rather than judging its browser preview.
 
 ## Stack
 
