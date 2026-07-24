@@ -41,6 +41,7 @@ import { trackWatchCompletion } from "@/lib/userPreferences";
 import {
   getDownloadRecord,
   deleteDownload as deleteDownloadFile,
+  isDirectVideoUrl,
   type DownloadStatus,
 } from "@/lib/downloads";
 import { useDownloads } from "@/contexts/DownloadContext";
@@ -265,7 +266,7 @@ export default function PlayerScreen() {
 
     const loadStream = async () => {
       // ── Step 1: directUrl param ───────────────────────────────────────────────
-      if (directUrl) {
+      if (directUrl && isDirectVideoUrl(directUrl)) {
         if (!cancelled) {
           setStreamResult({
             url: directUrl,
@@ -307,7 +308,7 @@ export default function PlayerScreen() {
               );
           const timeout = new Promise<null>((res) => setTimeout(() => res(null), 3000));
           const firebaseLink = await Promise.race([firebaseFetch, timeout]);
-          if (!cancelled && firebaseLink?.directVideo) {
+          if (!cancelled && firebaseLink?.directVideo && isDirectVideoUrl(firebaseLink.directVideo)) {
             const fUrl = firebaseLink.directVideo;
             setStreamResult({
               url: fUrl,
@@ -997,6 +998,13 @@ function NativePlayerScreen({
     }
     if (dlStatus === "downloading") {
       Alert.alert("Downloading…", `${Math.round(dlProgress * 100)}% complete`);
+      return;
+    }
+    if (!isDirectVideoUrl(videoUrl)) {
+      Alert.alert(
+        "Download unavailable",
+        "This server supports streaming only. Offline download needs a direct video file.",
+      );
       return;
     }
     haptic.success();

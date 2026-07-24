@@ -40,13 +40,13 @@ export interface MultiSourceResult {
 }
 
 // ─── Tier-1 India-Priority Sources ───────────────────────────────────────────
-// These are CONFIRMED working in India without VPN, ordered by priority.
-// smashystream.com is always primary — clean TMDB embed, India-friendly.
-// embed.su is the immediate fallback.
+// These are ordered by current availability. Keep dead domains out of the
+// first slot: the player should not spend its initial timeout on a 404 page.
 const T1_MOVIE: Array<{ source: string; movie: (id: number) => string; tv: (id: number, s: number, e: number) => string }> = [
-  // ★ PRIMARY — SmashyStream
-  { source: "smashystream.com",   movie: (id) => `https://embed.smashystream.com/playere.php?tmdb=${id}`, tv: (id,s,e) => `https://embed.smashystream.com/playere.php?tmdb=${id}&season=${s}&episode=${e}` },
-  // ★ FALLBACK — embed.su
+  // ★ PRIMARY — confirmed reachable embed endpoint
+  { source: "vidsrc.to",          movie: (id) => `https://vidsrc.to/embed/movie/${id}`,                  tv: (id,s,e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+  // ★ FALLBACK — clean alternate embed
+  { source: "vidlink.pro",        movie: (id) => `https://vidlink.pro/movie/${id}`,                      tv: (id,s,e) => `https://vidlink.pro/tv/${id}/${s}/${e}` },
   { source: "embed.su",           movie: (id) => `https://embed.su/embed/movie/${id}`,                   tv: (id,s,e) => `https://embed.su/embed/tv/${id}/${s}/${e}` },
   // Extended fallback pool ─────────────────────────────────────────────────
   { source: "superembed.stream",  movie: (id) => `https://superembed.stream/embed/movie/${id}`,          tv: (id,s,e) => `https://superembed.stream/embed/tv/${id}/${s}/${e}` },

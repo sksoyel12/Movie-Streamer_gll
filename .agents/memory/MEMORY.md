@@ -2,3 +2,4 @@
 - [Firebase preview configuration](firebase-preview.md) — keep the public Firebase web API-key fallback until shared Expo environment config is provisioned.
 - [Auth and watch progress](auth-watch-progress.md) — Firebase Auth is the session source; signed-in playback syncs to Firestore with local guest fallback.
 - [TMDB proxy configuration](tmdb-proxy.md) — server-side TMDB calls require the v3 key secret and fail explicitly when it is unavailable.
+- [Playback and downloads](playback-downloads.md) — embed pages are streaming-only; native playback and offline downloads require verified direct media URLs.

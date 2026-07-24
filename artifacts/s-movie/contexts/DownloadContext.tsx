@@ -191,9 +191,10 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
           completedMeta[movieId] = { ...completedMeta[movieId] };
           await saveMeta(completedMeta);
         }
-      } catch {
+      } catch (error) {
         activeStatus.current[movieId] = "error";
         delete activeProgress.current[movieId];
+        throw error;
       } finally {
         await refreshDownloads();
       }

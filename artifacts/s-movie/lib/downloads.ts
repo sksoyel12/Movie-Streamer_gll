@@ -14,6 +14,23 @@ export type DownloadRecord = {
 
 const STORAGE_KEY = "smovie_downloads_v2";
 
+/** Embed pages can be watched, but they are not downloadable video files. */
+export function isDirectVideoUrl(remoteUrl: string): boolean {
+  try {
+    const parsed = new URL(remoteUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
+    const path = parsed.pathname.toLowerCase();
+    return !(
+      path.includes("/embed") ||
+      path.endsWith(".php") ||
+      path.includes("/movie/") ||
+      path.includes("/tv/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getDownloadDir(): Directory {
   return new Directory(Paths.document, "smovie_downloads");
 }
@@ -73,6 +90,23 @@ export async function downloadVideo(
   remoteUrl: string,
   onProgress: (fraction: number) => void,
 ): Promise<string> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(remoteUrl);
+  } catch {
+    throw new Error("Download source is not a valid URL.");
+  }
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Download source must use HTTP or HTTPS.");
+  }
+
+  // An embed page is playable in WebView, but it is not a video file. Passing
+  // it to File.downloadFileAsync saves HTML and creates a fake "complete"
+  // download that can never play offline.
+  if (!isDirectVideoUrl(remoteUrl)) {
+    throw new Error("This server provides streaming only; no direct download file is available.");
+  }
+
   ensureDownloadDir();
   const destFile = getLocalFile(movieId);
   const localPath = destFile.uri;

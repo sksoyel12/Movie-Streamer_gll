@@ -37,18 +37,20 @@ export interface EmbedSource {
 }
 
 export const EMBED_SOURCES: EmbedSource[] = [
-  // ★ INDIA-FRIENDLY PRIMARY SOURCES — confirmed lowest latency in India ─────
+  // Keep a known-live source first. The old superembed.stream hostname now
+  // returns a 404 page, which made every playback attempt begin on a dead
+  // iframe before the fallback timer could run.
   {
-    name: "SuperEmbed",
-    subtitle: "India · Multi-Source · 85ms",
-    urlMovie: (id) => `https://superembed.stream/embed/movie/${id}`,
-    urlTV: (id, s, e) => `https://superembed.stream/embed/tv/${id}/${s}/${e}`,
+    name: "VidSrc.to",
+    subtitle: "Reliable · HD",
+    urlMovie: (id) => `https://vidsrc.to/embed/movie/${id}`,
+    urlTV: (id, s, e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}`,
   },
   {
-    name: "SmashyStream",
-    subtitle: "India · Hindi · Multi Quality",
-    urlMovie: (id) => `https://embed.smashystream.com/playere.php?tmdb=${id}`,
-    urlTV: (id, s, e) => `https://embed.smashystream.com/playere.php?tmdb=${id}&season=${s}&episode=${e}`,
+    name: "VidLink",
+    subtitle: "HD · Clean",
+    urlMovie: (id) => `https://vidlink.pro/movie/${id}`,
+    urlTV: (id, s, e) => `https://vidlink.pro/tv/${id}/${s}/${e}`,
   },
   {
     name: "EmbedSu",
