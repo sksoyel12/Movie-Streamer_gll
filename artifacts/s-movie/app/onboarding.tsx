@@ -633,7 +633,7 @@ export default function OnboardingScreen() {
             />
             <View style={styles.wordmarkRow}>
               <View style={styles.wordmarkAccent} />
-              <Text style={styles.wordmark}>S MOVIE <Text style={{ color: "#E50914" }}>ORIGINAL</Text></Text>
+              <Text style={styles.wordmark}>S-MOVIE</Text>
               <View style={styles.wordmarkAccent} />
             </View>
           </Animated.View>
