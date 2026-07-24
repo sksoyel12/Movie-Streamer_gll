@@ -28,9 +28,8 @@ const FETCH_TIMEOUT_MS = 10000;
 const MAX_RETRIES = 2;
 
 // ─── Concurrent request limiter ───────────────────────────────────────────────
-// Caps simultaneous TMDB calls to 8 so all-categories views load fast
-// while still preventing rate-limiting (429) from the API.
-const QUEUE_LIMIT = 8;
+// Caps simultaneous TMDB calls to 16 for faster parallel loading.
+const QUEUE_LIMIT = 16;
 let _qActive = 0;
 const _qPending: Array<() => void> = [];
 

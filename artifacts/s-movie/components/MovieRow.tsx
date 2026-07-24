@@ -10,7 +10,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 
 import { saveHomeCache, loadHomeCache } from "@/lib/homeCache";
 import { prefetchStream } from "@/lib/backgroundPrefetch";
@@ -459,17 +458,6 @@ const RowCard = React.memo(function RowCard({
             transition={250}
             recyclingKey={`${String(m.id)}-${activeGenre ?? "all"}-r${refreshKey}`}
           />
-          {/* Bottom gradient + title overlay */}
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.78)"]}
-            locations={[0.45, 1]}
-            style={styles.cardGradient}
-            pointerEvents="none"
-          >
-            <Text style={styles.cardTitleOverlay} numberOfLines={2}>
-              {m.title}
-            </Text>
-          </LinearGradient>
           {/* TOP 10 badge — top-right corner tab */}
           {hasTop10 && (
             <View style={styles.top10Badge}>
@@ -927,27 +915,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   thumb: { width: "100%", height: "100%" },
-
-  cardGradient: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 70,
-    justifyContent: "flex-end",
-    paddingHorizontal: 6,
-    paddingBottom: 6,
-    zIndex: 2,
-  },
-  cardTitleOverlay: {
-    color: "#fff",
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    lineHeight: 13,
-    textShadowColor: "rgba(0,0,0,0.9)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
 
   // ── "TOP 10" square sticker — top-RIGHT corner ────────────────────────────
   // Outside overflow:hidden so the corner is never clipped by the card radius.

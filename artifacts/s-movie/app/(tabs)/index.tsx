@@ -32,8 +32,8 @@ import { LATEST_NOTIF_AT } from "@/data/notifications";
 import { getDailyGradient } from "@/lib/dailyGradient";
 import { useUserPreferences } from "@/contexts/UserPreferencesContext";
 
-// Stagger row fetches so we don't fire ~50 TMDB requests in the same tick.
-const ROW_LOAD_STAGGER_MS = 120;
+// Stagger row fetches — first 8 rows load almost immediately, rest spread out.
+const ROW_LOAD_STAGGER_MS = 60;
 
 const { width: W } = Dimensions.get("window");
 
@@ -150,14 +150,12 @@ export default function HomeScreen() {
       const baseCards = qualified.slice(0, 10).map((m) => toMovieCard(tmdbToCard(m)));
       if (baseCards.length === 0) return;
 
-      // Poster Rotation Algorithm:
-      // For each hero card, fetch the TMDB /images pool (up to 50 posters) and
-      // use getLockedHomePosterUri to deterministically select + lock a poster
-      // for the current 15-hour rotation window. This ensures:
-      //   1. No flicker — same poster throughout a browsing session
-      //   2. Variety across sessions — poster changes every 15 hours
-      //   3. Per-title uniqueness — different titles show different posters
-      const enriched = await Promise.allSettled(
+      // Show hero IMMEDIATELY with base cards — no waiting for poster enrichment.
+      // Users see content instantly; text-logo posters swap in silently behind.
+      setHeroMovies(baseCards);
+
+      // Enrich in background: fetch text-logo poster pool per title and swap in.
+      Promise.allSettled(
         baseCards.map(async (card) => {
           const tmdbId = (card as any).tmdbId as number | undefined;
           if (!tmdbId) return card;
@@ -170,12 +168,11 @@ export default function HomeScreen() {
           );
           return uri ? ({ ...card, poster: { uri } } as Movie) : card;
         }),
-      );
-
-      const heroResult = enriched.map((r, i) => (r.status === "fulfilled" ? r.value : baseCards[i]));
-      setHeroMovies(heroResult);
-      // Persist hero with 24-hour TTL so it loads instantly on next app open.
-      saveHomeCacheTTL(HERO_CACHE_KEY, heroResult).catch(() => {});
+      ).then((enriched) => {
+        const heroResult = enriched.map((r, i) => (r.status === "fulfilled" ? r.value : baseCards[i]));
+        setHeroMovies(heroResult);
+        saveHomeCacheTTL(HERO_CACHE_KEY, heroResult).catch(() => {});
+      }).catch(() => {});
     } catch {
       // keep current state on error
     }
