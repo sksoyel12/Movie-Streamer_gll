@@ -1,11 +1,10 @@
 /**
- * Clips — Official Trailers & Clips reel (TikTok/Reels-style vertical feed)
+ * Clips — Instagram Reels-style vertical feed
  *
- * • Fetches trending movies/shows from TMDB + caches their videos (24 h)
- * • Snaps to each clip; auto-plays a muted preview when the card is visible
- * • Tapping the clip card opens the full-screen S MOVIE ORIGINAL player
- * • "Watch Trailer" opens the full-screen YouTube modal
- * • Only items with a backdrop/poster are shown; section hidden when empty
+ * • Full-screen vertical snap scroll
+ * • Right-side action bar (Play Trailer, Info, Share)
+ * • Bottom-left: title, overview, meta
+ * • Auto-plays muted YouTube preview when card is visible
  */
 import React, {
   useCallback,
@@ -20,15 +19,17 @@ import {
   Modal,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   ViewabilityConfig,
   ViewToken,
+  Animated,
 } from "react-native";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -52,7 +53,7 @@ interface ClipItem {
   backdropUri: string | null;
   posterUri: string | null;
   youtubeKey: string | null;
-  videoType: string; // "Trailer" | "Teaser" | "Clip"
+  videoType: string;
   overview: string;
   mediaType: "movie" | "tv";
   year: string;
@@ -89,12 +90,7 @@ function YoutubeEmbed({
       <View style={{ flex: 1, backgroundColor: "#000" }}>
         <iframe
           src={embedUrl}
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "none",
-            backgroundColor: "#000",
-          } as any}
+          style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#000" } as any}
           allow="autoplay; fullscreen"
           allowFullScreen
         />
@@ -109,7 +105,7 @@ function YoutubeEmbed({
     return (
       <View style={{ flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" }}>
         <Text style={{ color: "#fff", textAlign: "center", paddingHorizontal: 32 }}>
-          Trailer unavailable. Tap outside to close.
+          Trailer unavailable.
         </Text>
       </View>
     );
@@ -129,113 +125,186 @@ function YoutubeEmbed({
   );
 }
 
+// ─── Right-side action button ─────────────────────────────────────────────────
+
+function ActionBtn({
+  icon,
+  label,
+  onPress,
+  color = "#fff",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  color?: string;
+}) {
+  return (
+    <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.75}>
+      {icon}
+      <Text style={[styles.actionLabel, { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 // ─── Single clip card ─────────────────────────────────────────────────────────
 
 interface ClipCardProps {
   item: ClipItem;
   isVisible: boolean;
-  /** Pre-warm: mount a hidden, muted player so the next clip buffers in advance */
   isAdjacent?: boolean;
 }
 
 const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: ClipCardProps) {
   const [showTrailerModal, setShowTrailerModal] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const heartScale = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
 
-  // Tap on card → full-screen S MOVIE ORIGINAL player
-  const handleCardPress = useCallback(() => {
+  const handleLike = useCallback(() => {
     haptic.medium();
-    router.push({
-      pathname: "/player",
-      params: {
-        id: `tmdb-${item.tmdbId}`,
-        type: item.mediaType,
-        title_param: item.title,
-      },
-    });
-  }, [item]);
+    setLiked((v) => !v);
+    Animated.sequence([
+      Animated.spring(heartScale, { toValue: 1.4, useNativeDriver: true, speed: 30 }),
+      Animated.spring(heartScale, { toValue: 1,   useNativeDriver: true, speed: 30 }),
+    ]).start();
+  }, [heartScale]);
 
-  // "Watch Trailer" → YouTube modal
-  const handleTrailer = useCallback((e: any) => {
-    e.stopPropagation?.();
+  const handleTrailer = useCallback(() => {
     if (!item.youtubeKey) {
       haptic.light();
-      router.push({
-        pathname: "/movie/[id]",
-        params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title },
-      });
+      router.push({ pathname: "/movie/[id]", params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title } });
       return;
     }
     haptic.medium();
     setShowTrailerModal(true);
   }, [item]);
 
-  // Type badge color
-  const typeBadgeColor =
-    item.videoType === "Teaser" ? "#F59E0B" :
-    item.videoType === "Clip"   ? "#8B5CF6" :
-    "#E50914";
+  const handleInfo = useCallback(() => {
+    haptic.light();
+    router.push({ pathname: "/movie/[id]", params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title } });
+  }, [item]);
+
+  const handleShare = useCallback(async () => {
+    haptic.light();
+    try {
+      await Share.share({
+        message: `Watch "${item.title}" on S-Movie!\nhttps://www.themoviedb.org/${item.mediaType}/${item.tmdbId}`,
+        title: item.title,
+      });
+    } catch {}
+  }, [item]);
+
+  const handleSave = useCallback(() => {
+    haptic.light();
+    setSaved((v) => !v);
+  }, []);
+
+  // Genre chip color
+  const genreColor = item.mediaType === "tv" ? "#8B5CF6" : "#E50914";
 
   return (
-    <Pressable
-      style={[styles.card, { height: CLIP_H }]}
-      onPress={handleCardPress}
-    >
-      {/* Thumbnail — always rendered so it shows instantly before player is ready */}
+    <View style={[styles.card, { height: CLIP_H }]}>
+      {/* Background thumbnail */}
       <SmartImage
         source={
-          item.backdropUri
-            ? { uri: item.backdropUri }
-            : item.posterUri
-            ? { uri: item.posterUri }
-            : null
+          item.backdropUri ? { uri: item.backdropUri }
+          : item.posterUri  ? { uri: item.posterUri }
+          : null
         }
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         cachePolicy="memory-disk"
       />
 
-      {/* Sliding-window player pool:
-          - isVisible  → active, auto-playing, unmuted layer (z=1)
-          - isAdjacent → pre-warmed, fully hidden, muted (z=-1, opacity 0)
-            The WebView is mounted in advance so it buffers while out of view.
-            On swipe it instantly becomes visible without a cold-mount delay. */}
+      {/* YouTube preview (muted, auto-play when visible) */}
       {(isVisible || isAdjacent) && item.youtubeKey ? (
         <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              zIndex: isVisible ? 1 : -1,
-              opacity: isVisible ? 1 : 0,
-            },
-          ]}
+          style={[StyleSheet.absoluteFill, { zIndex: isVisible ? 1 : -1, opacity: isVisible ? 1 : 0 }]}
           pointerEvents={isVisible ? "auto" : "none"}
         >
           <YoutubeEmbed videoKey={item.youtubeKey} muted autoplay={isVisible} />
         </View>
       ) : null}
 
-      {/* Gradient overlay — always on top of media */}
+      {/* Gradient: heavy at bottom, light at top */}
       <LinearGradient
-        colors={["rgba(0,0,0,0.10)", "rgba(0,0,0,0.0)", "rgba(0,0,0,0.82)"]}
+        colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.92)"]}
+        locations={[0, 0.35, 1]}
         style={StyleSheet.absoluteFill}
-        locations={[0, 0.4, 1]}
         pointerEvents="none"
       />
 
-      {/* Content */}
-      <View
-        style={[styles.cardContent, { paddingBottom: insets.bottom + 90 }]}
-        pointerEvents="box-none"
-      >
-        {/* Genre + type badges */}
+      {/* ── Right-side action bar ───────────────────────────────────────────── */}
+      <View style={[styles.rightBar, { bottom: insets.bottom + 100 }]} pointerEvents="box-none">
+
+        {/* Like */}
+        <ActionBtn
+          icon={
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={32}
+                color={liked ? "#E50914" : "#fff"}
+              />
+            </Animated.View>
+          }
+          label={liked ? "Liked" : "Like"}
+          onPress={handleLike}
+          color={liked ? "#E50914" : "#fff"}
+        />
+
+        {/* Play Trailer */}
+        <ActionBtn
+          icon={
+            <View style={styles.playCircle}>
+              <Ionicons name="play" size={20} color="#000" />
+            </View>
+          }
+          label="Trailer"
+          onPress={handleTrailer}
+        />
+
+        {/* Info */}
+        <ActionBtn
+          icon={<Ionicons name="information-circle-outline" size={32} color="#fff" />}
+          label="Info"
+          onPress={handleInfo}
+        />
+
+        {/* Save */}
+        <ActionBtn
+          icon={
+            <Ionicons
+              name={saved ? "bookmark" : "bookmark-outline"}
+              size={30}
+              color={saved ? "#FBBF24" : "#fff"}
+            />
+          }
+          label={saved ? "Saved" : "Save"}
+          onPress={handleSave}
+          color={saved ? "#FBBF24" : "#fff"}
+        />
+
+        {/* Share */}
+        <ActionBtn
+          icon={<Ionicons name="paper-plane-outline" size={28} color="#fff" />}
+          label="Share"
+          onPress={handleShare}
+        />
+      </View>
+
+      {/* ── Bottom-left content ─────────────────────────────────────────────── */}
+      <View style={[styles.bottomContent, { paddingBottom: insets.bottom + 100, paddingRight: 90 }]} pointerEvents="box-none">
+
+        {/* Genre + video-type badges */}
         <View style={styles.badgeRow}>
-          <View style={styles.genreChip}>
-            <Text style={styles.genreText}>{item.genre}</Text>
+          <View style={[styles.chip, { backgroundColor: genreColor + "CC" }]}>
+            <Text style={styles.chipText}>{item.genre}</Text>
           </View>
-          {item.youtubeKey && (
-            <View style={[styles.typeBadge, { backgroundColor: typeBadgeColor + "CC" }]}>
-              <Text style={styles.typeBadgeText}>{item.videoType}</Text>
+          {item.videoType && item.youtubeKey && (
+            <View style={[styles.chip, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
+              <Text style={styles.chipText}>{item.videoType}</Text>
             </View>
           )}
         </View>
@@ -243,12 +312,12 @@ const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: C
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
-        {/* Year + rating */}
+        {/* Meta: year · rating */}
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{item.year}</Text>
+          {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
           {item.rating > 0 && (
             <>
-              <View style={styles.metaDot} />
+              <View style={styles.dot} />
               <Ionicons name="star" size={11} color="#FBBF24" />
               <Text style={styles.metaText}>{item.rating.toFixed(1)}</Text>
             </>
@@ -257,58 +326,28 @@ const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: C
 
         {/* Overview */}
         {item.overview ? (
-          <Text style={styles.overview} numberOfLines={3}>{item.overview}</Text>
+          <Text style={styles.overview} numberOfLines={2}>{item.overview}</Text>
         ) : null}
 
-        {/* Action row — stopPropagation so card press isn't triggered */}
-        <View style={styles.actionRow} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.playBtn}
-            onPress={handleTrailer}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="play" size={18} color="#000" />
-            <Text style={styles.playBtnText}>
-              {item.youtubeKey ? "Watch Trailer" : "View Details"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.detailBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              haptic.light();
-              router.push({
-                pathname: "/movie/[id]",
-                params: { id: `tmdb-${item.tmdbId}`, type: item.mediaType, title_param: item.title },
-              });
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="information-circle-outline" size={26} color="#fff" />
-            <Text style={styles.detailBtnText}>Info</Text>
-          </TouchableOpacity>
+        {/* Sound/music bar — Instagram Reels-style */}
+        <View style={styles.musicRow}>
+          <Ionicons name="musical-notes" size={13} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.musicText} numberOfLines={1}>
+            {item.title} · Original Sound
+          </Text>
         </View>
       </View>
 
       {/* Full-screen YouTube trailer modal */}
-      <Modal
-        visible={showTrailerModal}
-        animationType="slide"
-        onRequestClose={() => setShowTrailerModal(false)}
-        statusBarTranslucent
-      >
+      <Modal visible={showTrailerModal} animationType="slide" onRequestClose={() => setShowTrailerModal(false)} statusBarTranslucent>
         <View style={{ flex: 1, backgroundColor: "#000" }}>
           <YoutubeEmbed videoKey={item.youtubeKey!} autoplay />
-          <Pressable
-            style={styles.closeBtn}
-            onPress={() => setShowTrailerModal(false)}
-          >
-            <Ionicons name="close-circle" size={34} color="rgba(255,255,255,0.9)" />
+          <Pressable style={styles.closeBtn} onPress={() => setShowTrailerModal(false)}>
+            <Ionicons name="close-circle" size={36} color="rgba(255,255,255,0.9)" />
           </Pressable>
         </View>
       </Modal>
-    </Pressable>
+    </View>
   );
 });
 
@@ -328,75 +367,53 @@ export default function ClipsScreen() {
         tmdb.trendingTV(1),
       ]);
 
-      const movies = moviesPage.status === "fulfilled"
-        ? moviesPage.value.results.slice(0, 12)
-        : [];
-      const tvShows = tvPage.status === "fulfilled"
-        ? tvPage.value.results.slice(0, 8)
-        : [];
+      const movies  = moviesPage.status === "fulfilled" ? moviesPage.value.results.slice(0, 12) : [];
+      const tvShows = tvPage.status    === "fulfilled" ? tvPage.value.results.slice(0, 8)    : [];
 
       const combined = [
-        ...movies.map((m: any) => ({ ...m, media_type: "movie" as const })),
-        ...tvShows.map((t: any) => ({ ...t, media_type: "tv" as const })),
+        ...movies.map((m: any)  => ({ ...m, media_type: "movie" as const })),
+        ...tvShows.map((t: any) => ({ ...t, media_type: "tv"    as const })),
       ]
         .sort(() => Math.random() - 0.5)
-        .slice(0, 18);
+        .slice(0, 20);
 
-      // Fetch videos per item — try cache first, then TMDB
       const withVideos = await Promise.all(
         combined.map(async (item: any) => {
           let youtubeKey: string | null = null;
           let videoType = "Trailer";
           try {
             const mt: "movie" | "tv" = item.media_type;
-            const tmdbId: number = item.id;
-
-            // Cache-first
-            let videos: VideoEntry[] | null = await getCachedVideos(tmdbId, mt);
+            let videos: VideoEntry[] | null = await getCachedVideos(item.id, mt);
             if (!videos) {
-              const res = await tmdb.videos(mt, tmdbId);
-              const ytVideos = (res.results ?? []).filter(
-                (v: any) => v.site === "YouTube",
-              ) as VideoEntry[];
-              await setCachedVideos(tmdbId, mt, ytVideos);
+              const res = await tmdb.videos(mt, item.id);
+              const ytVideos = (res.results ?? []).filter((v: any) => v.site === "YouTube") as VideoEntry[];
+              await setCachedVideos(item.id, mt, ytVideos);
               videos = ytVideos;
             }
-
-            // Priority: Trailer > Teaser > Clip
             const pick =
               videos.find((v) => v.type === "Trailer") ??
-              videos.find((v) => v.type === "Teaser") ??
+              videos.find((v) => v.type === "Teaser")  ??
               videos.find((v) => v.type === "Clip");
-
-            if (pick) {
-              youtubeKey = pick.key;
-              videoType = pick.type;
-            }
+            if (pick) { youtubeKey = pick.key; videoType = pick.type; }
           } catch {}
 
-          const title = item.title ?? item.name ?? "Untitled";
-          const year = (item.release_date ?? item.first_air_date ?? "").slice(0, 4);
-          const backdropUri = item.backdrop_path ? tmdbImg(item.backdrop_path, "original") : null;
-          const posterUri = item.poster_path ? tmdbImg(item.poster_path, "w780") : null;
-
           return {
-            id: item.id,
-            tmdbId: item.id,
-            title,
-            backdropUri,
-            posterUri,
+            id:          item.id,
+            tmdbId:      item.id,
+            title:       item.title ?? item.name ?? "Untitled",
+            backdropUri: item.backdrop_path ? tmdbImg(item.backdrop_path, "original") : null,
+            posterUri:   item.poster_path   ? tmdbImg(item.poster_path,   "w780")     : null,
             youtubeKey,
             videoType,
-            overview: item.overview ?? "",
-            mediaType: item.media_type,
-            year,
-            rating: Math.round((item.vote_average ?? 0) * 10) / 10,
-            genre: item.media_type === "tv" ? "TV Show" : "Movie",
+            overview:    item.overview ?? "",
+            mediaType:   item.media_type,
+            year:        (item.release_date ?? item.first_air_date ?? "").slice(0, 4),
+            rating:      Math.round((item.vote_average ?? 0) * 10) / 10,
+            genre:       item.media_type === "tv" ? "TV Show" : "Movie",
           } as ClipItem;
         }),
       );
 
-      // Keep only items with an image
       setClips(withVideos.filter((c) => c.backdropUri || c.posterUri));
     } catch (e) {
       console.warn("[ClipsScreen] fetch error:", e);
@@ -408,8 +425,6 @@ export default function ClipsScreen() {
 
   useEffect(() => { fetchClips(); }, []);
 
-  // Prefetch video metadata for the next 2 items whenever the visible index changes.
-  // Runs silently in the background — never blocks the UI or duplicates TMDB calls.
   useEffect(() => {
     if (clips.length === 0) return;
     const upcoming = clips
@@ -419,21 +434,13 @@ export default function ClipsScreen() {
     prefetchVideos(upcoming, tmdb.videos.bind(tmdb)).catch(() => {});
   }, [visibleIndex, clips]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchClips();
-  }, [fetchClips]);
+  const onRefresh = useCallback(() => { setRefreshing(true); fetchClips(); }, [fetchClips]);
 
-  // Track which item is fully on screen for auto-play
-  const viewabilityConfig = useRef<ViewabilityConfig>({
-    viewAreaCoveragePercentThreshold: 80,
-  }).current;
-
+  const viewabilityConfig = useRef<ViewabilityConfig>({ viewAreaCoveragePercentThreshold: 80 }).current;
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      if (viewableItems.length > 0 && viewableItems[0].index != null)
         setVisibleIndex(viewableItems[0].index);
-      }
     },
   ).current;
 
@@ -460,12 +467,10 @@ export default function ClipsScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.headerBrand}>
-          <Text style={styles.headerLogo}>S</Text>
-          <Text style={styles.headerTitle}>CLIPS</Text>
-        </View>
+      {/* Floating header — Instagram Reels style */}
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]} pointerEvents="none">
+        <Text style={styles.headerTitle}>Clips</Text>
+        <View style={styles.headerUnderline} />
       </View>
 
       <FlatList
@@ -485,14 +490,9 @@ export default function ClipsScreen() {
         showsVerticalScrollIndicator={false}
         onRefresh={onRefresh}
         refreshing={refreshing}
-        getItemLayout={(_, index) => ({
-          length: CLIP_H,
-          offset: CLIP_H * index,
-          index,
-        })}
+        getItemLayout={(_, index) => ({ length: CLIP_H, offset: CLIP_H * index, index })}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        // Sliding window: 3 active instances max (current + 1 adjacent each side)
         windowSize={3}
         maxToRenderPerBatch={2}
         initialNumToRender={2}
@@ -505,167 +505,87 @@ export default function ClipsScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
+  root:  { flex: 1, backgroundColor: "#000" },
   center: {
-    flex: 1,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
+    flex: 1, backgroundColor: "#000",
+    justifyContent: "center", alignItems: "center", gap: 12,
   },
-  loadingText: {
-    color: "#737373",
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    marginTop: 8,
-  },
-  emptyText: {
-    color: "#737373",
-    fontSize: 16,
-    fontFamily: "Inter_500Medium",
-  },
+  loadingText: { color: "#737373", fontSize: 14, marginTop: 8 },
+  emptyText:   { color: "#737373", fontSize: 16 },
   retryBtn: {
-    marginTop: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: "#E50914",
-    borderRadius: 8,
+    marginTop: 8, paddingHorizontal: 24, paddingVertical: 12,
+    backgroundColor: "#E50914", borderRadius: 8,
   },
-  retryText: {
-    color: "#fff",
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-  },
+  retryText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+
+  // Floating header
   header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    paddingHorizontal: 18,
-    paddingBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  headerBrand: { flexDirection: "row", alignItems: "center", gap: 1 },
-  headerLogo: {
-    color: "#E50914",
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
+    position: "absolute", top: 0, left: 0, right: 0,
+    zIndex: 200, paddingHorizontal: 18, paddingBottom: 6,
+    alignItems: "flex-start",
   },
   headerTitle: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 3,
-    marginLeft: 2,
+    color: "#fff", fontSize: 20, fontWeight: "700", letterSpacing: 0.3,
   },
-  card: {
-    width: W,
-    position: "relative",
-    overflow: "hidden",
+  headerUnderline: {
+    marginTop: 3, width: 28, height: 2.5,
+    backgroundColor: "#E50914", borderRadius: 2,
   },
-  cardContent: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    gap: 8,
-    zIndex: 10,
+
+  // Card
+  card: { width: W, position: "relative", overflow: "hidden" },
+
+  // Right-side action bar (Instagram Reels style)
+  rightBar: {
+    position: "absolute", right: 12,
+    alignItems: "center", gap: 22, zIndex: 20,
   },
-  badgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  actionBtn: { alignItems: "center", gap: 4 },
+  actionLabel: {
+    color: "#fff", fontSize: 11, fontWeight: "600",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  genreChip: {
-    backgroundColor: "rgba(229,9,20,0.85)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  playCircle: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: "#fff",
+    alignItems: "center", justifyContent: "center",
   },
-  genreText: {
-    color: "#fff",
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+
+  // Bottom-left content
+  bottomContent: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16, gap: 6, zIndex: 10,
   },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  badgeRow:  { flexDirection: "row", alignItems: "center", gap: 6 },
+  chip: {
+    paddingHorizontal: 9, paddingVertical: 3,
+    borderRadius: 5,
   },
-  typeBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+  chipText: {
+    color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.4,
   },
   title: {
-    color: "#ffffff",
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 30,
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: "#fff", fontSize: 22, fontWeight: "800", lineHeight: 28,
+    textShadowColor: "rgba(0,0,0,0.75)",
+    textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5,
   },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  metaText: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+  metaText: { color: "rgba(255,255,255,0.75)", fontSize: 12 },
+  dot: {
+    width: 3, height: 3, borderRadius: 1.5,
     backgroundColor: "rgba(255,255,255,0.5)",
   },
   overview: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 19,
+    color: "rgba(255,255,255,0.65)", fontSize: 13, lineHeight: 18,
   },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 4,
+  musicRow: {
+    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2,
   },
-  playBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    borderRadius: 8,
-    flex: 1,
-    justifyContent: "center",
+  musicText: {
+    color: "rgba(255,255,255,0.65)", fontSize: 12, flex: 1,
   },
-  playBtnText: {
-    color: "#000",
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-  },
-  detailBtn: {
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 6,
-  },
-  detailBtnText: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-  },
-  closeBtn: {
-    position: "absolute",
-    top: 52,
-    right: 16,
-    zIndex: 100,
-  },
+
+  closeBtn: { position: "absolute", top: 52, right: 16, zIndex: 100 },
 });
