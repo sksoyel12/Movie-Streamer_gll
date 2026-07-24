@@ -1,5 +1,6 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image as ExpoImage } from "expo-image";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import * as FileSystem from "expo-file-system/legacy";
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
   const [osApi, setOsApi]                     = useState("—");
 
   const [checkingUpdate, setCheckingUpdate]   = useState(false);
+  const [clearingCache, setClearingCache]     = useState(false);
 
   // ── Load persisted preferences ──────────────────────────────────────────
   useEffect(() => {
@@ -180,6 +182,44 @@ export default function SettingsScreen() {
     }
   }, [checkingUpdate]);
 
+  const handleClearCache = useCallback(() => {
+    haptic.medium();
+    Alert.alert(
+      "Clear Cache",
+      "This frees up storage by removing all cached images and API data. The app will re-download content on next launch.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear Cache",
+          style: "destructive",
+          onPress: async () => {
+            setClearingCache(true);
+            try {
+              // Clear expo-image disk + memory caches (offline image store)
+              await Promise.allSettled([
+                ExpoImage.clearDiskCache(),
+                ExpoImage.clearMemoryCache(),
+              ]);
+              // Clear all smovie_ AsyncStorage keys:
+              //   poster lock entries, home cache, Gemini score cache,
+              //   remind-me flags, new-hot feed cache, etc.
+              const allKeys = await AsyncStorage.getAllKeys();
+              const smovieKeys = allKeys.filter(
+                (k) => k.startsWith("smovie_") || k.startsWith("@smovie"),
+              );
+              if (smovieKeys.length > 0) await AsyncStorage.multiRemove(smovieKeys);
+              Alert.alert("Done", "Cache cleared successfully. Freed up image and data storage.");
+            } catch {
+              Alert.alert("Error", "Couldn't clear all cache. Please try again.");
+            } finally {
+              setClearingCache(false);
+            }
+          },
+        },
+      ],
+    );
+  }, []);
+
   const handleLogout = useCallback(() => {
     haptic.medium();
     Alert.alert("Log Out", "Are you sure you want to log out of your account?", [
@@ -294,6 +334,21 @@ export default function SettingsScreen() {
             sub="Data usage & permission controls"
             right={<Feather name="chevron-right" size={18} color="#404040" />}
             onPress={() => router.push("/privacy")}
+          />
+        </SettingsSection>
+
+        {/* ── Storage & Cache ─────────────────────────────────────────── */}
+        <SettingsSection title="Storage & Cache">
+          <SettingsRow
+            icon={<Ionicons name="trash-outline" size={20} color="#E50914" />}
+            label="Clear Cache"
+            sub="Remove cached images and API data to free up space"
+            labelStyle={{ color: "#E50914" }}
+            right={clearingCache
+              ? <ActivityIndicator size="small" color="#E50914" />
+              : <Feather name="chevron-right" size={18} color="#404040" />}
+            onPress={clearingCache ? undefined : handleClearCache}
+            disabled={clearingCache}
           />
         </SettingsSection>
 

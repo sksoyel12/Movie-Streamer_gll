@@ -280,69 +280,48 @@ export default function SearchTabScreen() {
     });
   };
 
-  // ── Grid card ────────────────────────────────────────────────────
-  const renderGridItem = ({ item, index }: { item: SearchResult; index: number }) => {
-    const isLast = (index + 1) % NUM_COLUMNS === 0;
+  // ── Grid card — clean poster only, no text/ratings per spec ─────
+  const renderGridItem = ({ item }: { item: SearchResult }) => {
     return (
       <Pressable
         onPress={() => onPressResult(item)}
-        style={({ pressed }) => [st.gridCard, { marginRight: isLast ? 0 : CARD_GAP }, pressed && { opacity: 0.78, transform: [{ scale: 0.96 }] }]}
+        style={({ pressed }) => [st.gridCard, pressed && { opacity: 0.78, transform: [{ scale: 0.96 }] }]}
       >
         {item.poster?.uri ? (
-          <SmartImage source={{ uri: item.poster.uri }} style={st.gridPoster} contentFit="cover" transition={300} cachePolicy="memory-disk" />
+          <SmartImage source={{ uri: item.poster.uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} cachePolicy="disk" />
         ) : (
-          <View style={[st.gridPoster, { backgroundColor: "#111", alignItems: "center", justifyContent: "center" }]}>
-            <Feather name="film" size={28} color="#2a2a2a" />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#111", alignItems: "center", justifyContent: "center" }]}>
+            <Feather name="film" size={22} color="#2a2a2a" />
           </View>
         )}
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.88)"]} style={st.gridGradient} />
-        <View style={[st.typeBadge, item.mediaType === "tv" ? st.typeBadgeTV : st.typeBadgeMovie]}>
-          <Text style={st.typeBadgeText}>{item.mediaType === "tv" ? "TV" : "MV"}</Text>
-        </View>
-        <View style={st.gridInfo}>
-          <Text style={st.gridTitle} numberOfLines={2}>{item.title}</Text>
-          <View style={st.gridMeta}>
-            <Text style={st.gridYear}>{item.year}</Text>
-            {item.rating > 0 && (
-              <View style={st.ratingBadge}>
-                <Text style={st.ratingText}>{item.rating.toFixed(1)}</Text>
-              </View>
-            )}
-          </View>
-        </View>
       </Pressable>
     );
   };
 
-  // ── Trending list row ─────────────────────────────────────────────
+  // ── Recommended row — 16:9 landscape thumbnail + title + circular play ──
+  // NO ratings shown per spec ("Do NOT show any star ratings")
   const renderTrendingRow = (item: SearchResult) => (
     <Pressable
       key={item.id}
       onPress={() => onPressResult(item)}
       style={({ pressed }) => [st.trendRow, pressed && { backgroundColor: "#111" }]}
     >
-      <View>
+      {/* 16:9 landscape backdrop thumbnail */}
+      <View style={st.trendThumb}>
         {item.poster?.uri ? (
-          <SmartImage source={{ uri: item.poster.uri }} style={st.trendThumb} contentFit="cover" cachePolicy="memory-disk" />
+          <SmartImage source={{ uri: item.poster.uri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="disk" />
         ) : (
-          <View style={[st.trendThumb, { backgroundColor: "#1a1a1a", alignItems: "center", justifyContent: "center" }]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1a1a1a", alignItems: "center", justifyContent: "center" }]}>
             <Feather name="film" size={16} color="#333" />
           </View>
         )}
       </View>
-      <View style={st.trendInfo}>
-        <Text style={st.trendTitle} numberOfLines={1}>{item.title}</Text>
-        <View style={st.trendMeta}>
-          <View style={[st.trendPill, item.mediaType === "tv" ? st.trendPillTV : st.trendPillMV]}>
-            <Text style={st.trendPillText}>
-              {item.mediaType === "tv" ? "TV Show" : "Movie"}
-            </Text>
-          </View>
-          <Text style={st.trendYear}>{item.year}</Text>
-          {item.rating > 0 && <Text style={st.trendRating}>{item.rating.toFixed(1)}</Text>}
-        </View>
+      {/* Title — no rating, no year, no media type pill */}
+      <Text style={st.trendTitle} numberOfLines={2}>{item.title}</Text>
+      {/* Circular play button — right aligned */}
+      <View style={st.playCircle}>
+        <Feather name="play" size={16} color="#fff" />
       </View>
-      <Feather name="chevron-right" size={17} color="#2a2a2a" />
     </Pressable>
   );
 
@@ -377,29 +356,14 @@ export default function SearchTabScreen() {
         </View>
       )}
 
-      {/* Trending Movies */}
-      {trendingMovies.length > 0 && (
+      {/* Recommended Shows & Movies — merged list, NO ratings per spec */}
+      {(trendingMovies.length > 0 || trendingTV.length > 0) && (
         <View style={st.section}>
-          <View style={st.sectionHead}>
-            <View style={st.sectionLeft}>
-              <Ionicons name="trending-up" size={16} color="#e5e5e5" />
-              <Text style={st.sectionTitle}>Trending Movies</Text>
-            </View>
-          </View>
-          {trendingMovies.slice(0, 8).map(renderTrendingRow)}
-        </View>
-      )}
-
-      {/* Trending TV */}
-      {trendingTV.length > 0 && (
-        <View style={[st.section, { marginTop: 8 }]}>
-          <View style={st.sectionHead}>
-            <View style={st.sectionLeft}>
-              <Ionicons name="tv-outline" size={16} color="#e5e5e5" />
-              <Text style={st.sectionTitle}>Trending TV Shows</Text>
-            </View>
-          </View>
-          {trendingTV.slice(0, 8).map(renderTrendingRow)}
+          <Text style={st.sectionTitle2}>Recommended Shows &amp; Movies</Text>
+          {[...trendingTV.slice(0, 6), ...trendingMovies.slice(0, 6)]
+            .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
+            .slice(0, 12)
+            .map(renderTrendingRow)}
         </View>
       )}
       <View style={{ height: 100 }} />
@@ -413,7 +377,7 @@ export default function SearchTabScreen() {
     <View style={st.root}>
       <SafeAreaView style={st.safe} edges={["top"]}>
 
-        {/* ── Search bar (Netflix-style, no title above) ─────────── */}
+        {/* ── Search bar — search icon left, mic/X icon right ────── */}
         <View style={st.searchBarWrap}>
           <View style={[st.searchBar, query.length > 0 && st.searchBarActive]}>
             <Feather name="search" size={19} color={query.length > 0 ? "#e5e5e5" : "#666"} />
@@ -422,18 +386,22 @@ export default function SearchTabScreen() {
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={() => { if (query.trim()) addHistory(query.trim()); }}
-              placeholder="Movies, shows, actors…"
+              placeholder="Search shows, movies, game..."
               placeholderTextColor="#555"
               style={st.searchInput}
               returnKeyType="search"
               autoCorrect={false}
               clearButtonMode="never"
             />
-            {query.length > 0 && (
+            {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} hitSlop={12}>
                 <View style={st.clearBtn}>
                   <Feather name="x" size={13} color="#999" />
                 </View>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => inputRef.current?.focus()} hitSlop={12} style={st.micBtn}>
+                <Feather name="mic" size={17} color="#666" />
               </Pressable>
             )}
           </View>
@@ -464,7 +432,6 @@ export default function SearchTabScreen() {
               renderItem={renderGridItem}
               numColumns={NUM_COLUMNS}
               contentContainerStyle={st.gridContent}
-              columnWrapperStyle={{ gap: CARD_GAP, marginBottom: CARD_GAP }}
               keyboardShouldPersistTaps="handled"
               onEndReached={loadNextGenrePage}
               onEndReachedThreshold={0.4}
@@ -512,7 +479,6 @@ export default function SearchTabScreen() {
             renderItem={renderGridItem}
             numColumns={NUM_COLUMNS}
             contentContainerStyle={st.gridContent}
-            columnWrapperStyle={{ gap: CARD_GAP, marginBottom: CARD_GAP }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             onEndReached={loadNextPage}
@@ -555,9 +521,7 @@ const st = StyleSheet.create({
     paddingVertical: 13,
     gap: 11,
   },
-  searchBarActive: {
-    backgroundColor: "#222222",
-  },
+  searchBarActive: { backgroundColor: "#222222" },
   searchInput: {
     flex: 1,
     color: "#fff",
@@ -566,10 +530,16 @@ const st = StyleSheet.create({
     padding: 0,
   },
   clearBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: "#3a3a3a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micBtn: {
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -596,38 +566,27 @@ const st = StyleSheet.create({
   skeletonGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
     paddingTop: 4,
-    gap: CARD_GAP,
   },
   skeletonCard: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: 10,
+    flex: 1,
+    aspectRatio: 2 / 3,
+    margin: 3,
+    borderRadius: 4,
     backgroundColor: "#111",
   },
 
-  gridContent: { paddingHorizontal: 16, paddingBottom: 100 },
-
+  // Grid — pure poster images, flex:1 + aspectRatio:2/3 for equal sizing, NO text/ratings
+  gridContent: { paddingHorizontal: 4, paddingBottom: 100 },
   gridCard: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: 10,
+    flex: 1,
+    aspectRatio: 2 / 3,
+    margin: 3,
+    borderRadius: 4,
     overflow: "hidden",
     backgroundColor: "#0d0d0d",
   },
-  gridPoster: { width: "100%", height: "100%" },
-  gridGradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: "55%" },
-  typeBadge: { position: "absolute", top: 6, left: 6, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3 },
-  typeBadgeTV: { backgroundColor: "rgba(80,80,80,0.90)" },
-  typeBadgeMovie: { backgroundColor: "rgba(229,9,20,0.80)" },
-  typeBadgeText: { color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  gridInfo: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 8 },
-  gridTitle: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold", lineHeight: 14 },
-  gridMeta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
-  gridYear: { color: "rgba(255,255,255,0.45)", fontSize: 9, fontFamily: "Inter_400Regular" },
-  ratingBadge: { backgroundColor: "rgba(0,0,0,0.60)", borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
-  ratingText: { color: "#f5c518", fontSize: 9, fontFamily: "Inter_600SemiBold" },
 
   section: { marginTop: 20 },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 10 },
@@ -662,17 +621,21 @@ const st = StyleSheet.create({
     maxWidth: 160,
   },
 
-  trendRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, gap: 12, borderRadius: 6 },
-  trendThumb: { width: 72, height: 46, borderRadius: 6, backgroundColor: "#111" },
-  trendInfo: { flex: 1 },
-  trendTitle: { color: "#e5e5e5", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  trendMeta: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 4 },
-  trendPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, backgroundColor: "#1a1a1a", borderWidth: 1, borderColor: "#2a2a2a" },
-  trendPillTV: {},
-  trendPillMV: {},
-  trendPillText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#a3a3a3" },
-  trendYear: { color: "#525252", fontSize: 10, fontFamily: "Inter_400Regular" },
-  trendRating: { color: "#f5c518", fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  // Recommended row — 16:9 landscape thumb + title + circular play button, NO ratings
+  trendRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, gap: 14, borderRadius: 6 },
+  trendThumb: { width: 120, height: 68, borderRadius: 6, backgroundColor: "#111", overflow: "hidden" },
+  trendTitle: { flex: 1, color: "#e5e5e5", fontSize: 14, fontFamily: "Inter_600SemiBold", lineHeight: 19 },
+  playCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
 
   chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: "#1a1a1a", borderWidth: 1, borderColor: "#2a2a2a" },
   chipActive: { backgroundColor: "#E50914", borderColor: "#E50914" },

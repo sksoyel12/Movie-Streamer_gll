@@ -1,41 +1,48 @@
 /**
- * posterAlgorithm.ts — Netflix-style 15-hour locked poster rotation
+ * posterAlgorithm.ts — Netflix-grade 12-hour locked poster rotation
  *
- * Algorithm:
- *   rotation_key = Math.floor(Date.now() / (15 * 60 * 60 * 1000))
+ * Algorithm (per spec):
+ *   seed = Math.floor(Date.now() / (12 * 60 * 60 * 1000))
+ *   index = (movieId + seed) % availablePosters.length
  *
- * • Every title gets a poster locked for one 15-hour window.
+ * • Every title gets a poster locked for one 12-hour window.
  * • The same poster is shown to the user throughout a browsing session
- *   (anti-flicker) — it only changes when the next 15-hour window opens.
+ *   (anti-flicker) — it only changes when the next 12-hour window opens.
  * • Home screen and Detail screen intentionally use DIFFERENT posters:
- *     Home   → pool[rotation_key % pool.length]
- *     Detail → images[1]  (different fixed index)
+ *     Home   → pool[(movieId + seed) % pool.length]  (rotation-key based)
+ *     Detail → images[1]  (always next poster = distinct from Home)
  *
  * Auto-purge runs at app start and removes expired locks (> 24 h old) so
  * AsyncStorage memory footprint stays low.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const POSTER_LOCK_PREFIX  = "smovie_poster_rkv2_";
-const ROTATION_PERIOD_MS  = 15 * 60 * 60 * 1000; // 15 hours
+const POSTER_LOCK_PREFIX  = "smovie_poster_rkv3_"; // v3 = 12-hour cycle
+const ROTATION_PERIOD_MS  = 12 * 60 * 60 * 1000;  // 12 hours — per spec
 
 // ─── Core rotation helpers ─────────────────────────────────────────────────────
 
-/** Returns the current 15-hour rotation bucket integer. Changes every 15 hours. */
+/** Returns the current 12-hour rotation bucket integer. Changes every 12 hours. */
 export function getRotationKey(): number {
   return Math.floor(Date.now() / ROTATION_PERIOD_MS);
 }
 
 /**
- * Deterministic poster index for a given movie within the current 15-hour window.
- * Uses movieId as additional entropy so different titles pick different posters
- * from their respective pools even within the same rotation window.
+ * Deterministic poster index for the current 12-hour window.
+ *
+ * Spec formula: (movieId + seed) % availablePosters.length
+ * where seed = Math.floor(Date.now() / (12 * 60 * 60 * 1000))
+ *
+ * This guarantees:
+ * • Same poster throughout the user's session (no flicker)
+ * • Rotates to a new poster every 12 hours
+ * • Each title picks from a different position in its pool
  */
 export function getPosterIndexForWindow(movieId: number | string, poolSize: number): number {
   if (poolSize <= 0) return 0;
-  const rk  = getRotationKey();
-  const seed = rk * 31 + Number(String(movieId).replace(/\D/g, "").slice(-6) || 0);
-  return Math.abs(seed) % poolSize;
+  const seed   = getRotationKey(); // Math.floor(Date.now() / 12h)
+  const numId  = Number(String(movieId).replace(/\D/g, "").slice(-8) || 0);
+  return (numId + seed) % poolSize;
 }
 
 // ─── AsyncStorage-backed locked poster ────────────────────────────────────────

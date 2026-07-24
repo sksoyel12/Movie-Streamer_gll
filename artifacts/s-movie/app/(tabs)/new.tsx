@@ -17,11 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { haptic } from "@/lib/haptics";
 import { tmdb, tmdbGet, tmdbToCard, type TMDBMovie } from "@/lib/tmdb";
-import HindiBadge from "@/components/HindiBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const NEW_HOT_CACHE_KEY = "smovie_new_hot_v3";
-const NEW_HOT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes — keep fresh
+const NEW_HOT_CACHE_KEY  = "smovie_new_hot_v4";        // v4 = Netflix-only
+const NEW_HOT_CACHE_TTL  = 5 * 60 * 1000;              // 5 minutes — keep fresh
+const REMIND_KEY_PREFIX  = "smovie_remind_v1_";         // AsyncStorage reminder persistence
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const BANNER_H = Math.round(SCREEN_W * 0.555);
@@ -104,15 +104,23 @@ export default function NewAndHotScreen() {
     setTimeout(() => setToast({ message: "", visible: false }), 2200);
   };
 
-  // Load cached data immediately so the screen never starts blank
+  // Load cached data + persisted reminders immediately so screen never starts blank
   useEffect(() => {
+    // Restore reminder state from AsyncStorage
+    AsyncStorage.getAllKeys().then((keys) => {
+      const ids = keys
+        .filter((k) => k.startsWith(REMIND_KEY_PREFIX))
+        .map((k) => k.slice(REMIND_KEY_PREFIX.length));
+      if (ids.length > 0) setReminders(new Set(ids));
+    }).catch(() => {});
+
+    // Restore cached feed
     AsyncStorage.getItem(NEW_HOT_CACHE_KEY).then((raw) => {
       if (!raw) return;
       try {
         const { upcoming: u, trending: t, savedAt } = JSON.parse(raw);
         if (u?.length) setUpcoming(u);
         if (t?.length) setTrending(t);
-        // If cache is fresh enough, skip the network fetch
         if (Date.now() - savedAt < NEW_HOT_CACHE_TTL) setLoading(false);
       } catch {}
     }).catch(() => {});
@@ -121,59 +129,50 @@ export default function NewAndHotScreen() {
   const fetchData = async (isRefresh = false) => {
     setError(null);
     try {
-      // Fetch all 4 required sources in parallel
-      const [upcomingMovies, tvPopular, trendingDay, trendingWeek] = await Promise.all([
-        tmdb.upcoming(1),
-        tmdb.popularTV(1),
-        tmdb.trendingToday(1),
-        tmdb.trending(1),
+      // ── Netflix-only data sources (with_networks=213) ─────────────────────
+      // Coming Soon: Netflix New Releases (TV + Movie merged, sorted by date desc)
+      // Everyone's Watching: Netflix TV by popularity (network 213)
+      const netflixTVFetcher  = tmdb.netflixTV({ sort_by: "popularity.desc" });
+      const [netflixNew, netflixPopular] = await Promise.all([
+        tmdb.netflixNewReleasesAll(1),   // merged Netflix TV + Movie, sorted by release_date.desc
+        netflixTVFetcher(1),             // Netflix TV by popularity for Everyone's Watching
       ]);
 
-      // ── Coming Soon: upcoming movies + popular TV (sorted by nearest date)
-      const movieCards = upcomingMovies.results
-        .filter((m) => m.poster_path || m.backdrop_path)
-        .map((m) => ({ ...tmdbToCard(m as TMDBMovie), releaseDate: m.release_date ?? (m as any).first_air_date }));
-
-      const tvCards = tvPopular.results
-        .filter((m) => m.poster_path || m.backdrop_path)
-        .map((m) => ({ ...tmdbToCard(m as TMDBMovie), releaseDate: (m as any).first_air_date ?? m.release_date }));
-
-      // Only show movies releasing from today or in the future
+      // ── Coming Soon: Netflix new releases — show nearest upcoming first ────
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       const seenCS = new Set<string>();
-      const mergedCS = [...movieCards, ...tvCards]
-        .filter((m) => {
+      const upcomingList = (netflixNew.results ?? [])
+        .filter((m: any) => {
           if (isBlacklisted(m)) return false;
-          if (seenCS.has(m.id)) return false;
-          // Skip movies that have already released (past dates)
-          const rd = m.releaseDate ? new Date(m.releaseDate) : null;
-          if (rd && rd.getTime() < todayStart.getTime()) return false;
-          seenCS.add(m.id);
+          const key = String(m.id);
+          if (seenCS.has(key)) return false;
+          if (!m.backdrop_path && !m.poster_path) return false;
+          seenCS.add(key);
           return true;
         })
-        .sort((a, b) => {
-          const dA = new Date(a.releaseDate ?? "2100-01-01").getTime();
-          const dB = new Date(b.releaseDate ?? "2100-01-01").getTime();
-          return dA - dB;
-        });
+        .map((m: any) => ({
+          ...tmdbToCard(m as TMDBMovie),
+          releaseDate: m.first_air_date ?? m.release_date,
+        }))
+        .slice(0, 20);
 
-      const upcomingList = mergedCS.slice(0, 20);
       setUpcoming(upcomingList);
 
-      // ── Everyone's Watching: trending/day + trending/week merged & deduped
+      // ── Everyone's Watching: Netflix TV sorted by popularity ──────────────
       const seenEW = new Set<string>();
-      const trendingList = [...trendingDay.results, ...trendingWeek.results]
-        .filter((m) => {
+      const trendingList = (netflixPopular.results ?? [])
+        .filter((m: any) => {
           if (isBlacklisted(m)) return false;
           const key = String(m.id);
           if (seenEW.has(key)) return false;
           seenEW.add(key);
           return true;
         })
-        .map(tmdbToCard)
+        .map((m: any) => tmdbToCard(m as TMDBMovie))
         .slice(0, 20);
+
       setTrending(trendingList);
 
       // Persist to cache
@@ -205,8 +204,15 @@ export default function NewAndHotScreen() {
     haptic.selection();
     setReminders((prev) => {
       const next = new Set(prev);
-      if (next.has(m.id)) { next.delete(m.id); showToast("Reminder removed"); }
-      else                { next.add(m.id);    showToast("🔔 Reminder set!"); }
+      if (next.has(m.id)) {
+        next.delete(m.id);
+        AsyncStorage.removeItem(REMIND_KEY_PREFIX + m.id).catch(() => {});
+        showToast("Reminder removed");
+      } else {
+        next.add(m.id);
+        AsyncStorage.setItem(REMIND_KEY_PREFIX + m.id, "1").catch(() => {});
+        showToast("🔔 Reminder set!");
+      }
       return next;
     });
   };
@@ -387,13 +393,10 @@ function ComingSoonCard({
           </View>
         )}
 
-        {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
-        <HindiBadge
-          tmdbId={m.tmdbId}
-          mediaType={m.mediaType ?? "movie"}
-          style={styles.hindiBadge}
-          textStyle={styles.hindiBadgeText}
-        />
+        {/* Age Rating badge — top-right corner, no N logo overlay */}
+        <View style={styles.ageBadge}>
+          <Text style={styles.ageBadgeText}>U/A 16+</Text>
+        </View>
       </View>
 
       {/* ── Content below banner ── */}
@@ -490,13 +493,10 @@ function EveryonesWatchingCard({
           <Text style={styles.rankLabel}>in India Today</Text>
         </View>
 
-        {/* Hindi badge — only rendered when TMDB confirms Hindi audio exists */}
-        <HindiBadge
-          tmdbId={m.tmdbId}
-          mediaType={m.mediaType ?? "tv"}
-          style={styles.hindiBadge}
-          textStyle={styles.hindiBadgeText}
-        />
+        {/* Age Rating badge — top-right, no N logo overlay */}
+        <View style={styles.ageBadge}>
+          <Text style={styles.ageBadgeText}>U/A 16+</Text>
+        </View>
       </View>
 
       {/* ── Logo or title ── */}
@@ -654,23 +654,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     letterSpacing: 1.2,
   },
-  hindiBadge: {
+  // U/A 16+ age rating badge — top-right of every card image
+  ageBadge: {
     position: "absolute",
     top: 10,
     right: 10,
-    backgroundColor: "rgba(0,0,0,0.65)",
+    backgroundColor: "rgba(0,0,0,0.70)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
+    borderColor: "rgba(255,255,255,0.30)",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
     zIndex: 3,
   },
-  hindiBadgeText: {
+  ageBadgeText: {
     color: "#fff",
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
   trailerPlayBtn: {
     position: "absolute",
