@@ -63,6 +63,10 @@ export async function createNotificationChannels() {
  * Local notifications work even WITHOUT a push token — permission is enough.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  // Skip on web — browser notification permission dialog is disruptive on app open.
+  // Users can enable notifications from the Profile → Settings screen instead.
+  if (Platform.OS === "web") return null;
+
   await createNotificationChannels();
 
   // Simulators/emulators can still run local scheduled notifications,

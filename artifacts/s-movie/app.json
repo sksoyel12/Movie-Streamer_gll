@@ -47,7 +47,9 @@
         "android.permission.REQUEST_INSTALL_PACKAGES",
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-logo.png",
