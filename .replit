@@ -26,3 +26,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 EXPO_PUBLIC_FIREBASE_API_KEY = "AIzaSyBLjgLERkJysAS-J1Ya4OOlX8t0u049hjs"
+EXPO_PUBLIC_API_URL = "https://dac17775-d574-4473-b458-342664acd72e-00-3innc9zb1vb5.sisko.replit.dev/api"
