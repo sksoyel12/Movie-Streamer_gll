@@ -23,16 +23,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE } from "@/lib/apiBase";
 
 // Web-only: hidden file input ref type
 type WebFileInput = HTMLInputElement | null;
 
-const _PROXY_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : null);
-const CHAT_URL = _PROXY_HOST ? `${_PROXY_HOST}/api/chat` : null;
+const CHAT_URL = API_BASE ? `${API_BASE}/chat` : null;
 
 const FIREBASE_PROJECT_ID = "movie-original";
 const FIREBASE_BUCKET = "movie-original.firebasestorage.app";

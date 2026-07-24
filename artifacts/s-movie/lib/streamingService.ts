@@ -659,15 +659,10 @@ export const STREAM_SOURCES = getAllSourceNames().map((name) => ({
   domain: name,
 }));
 
-/** API server base URL (used by other modules) */
-const REPLIT_API_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  `https://${process.env.EXPO_PUBLIC_DOMAIN ?? "c06a2b56-a6eb-45e9-b9a7-b40a557a3693-00-37qwb5r50yelh.pike.replit.dev"}`;
+import { API_BASE } from "@/lib/apiBase";
 
 export function getApiBase(): string {
-  return REPLIT_API_HOST.endsWith("/api")
-    ? REPLIT_API_HOST
-    : `${REPLIT_API_HOST}/api`;
+  return API_BASE ?? "";
 }
 
 export interface DirectStreamResult {

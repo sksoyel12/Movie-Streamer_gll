@@ -19,6 +19,7 @@ import SmartImage from "@/components/SmartImage";
 import { haptic } from "@/lib/haptics";
 import { Skeleton } from "@/components/Skeleton";
 import { saveHomeCache, loadHomeCache } from "@/lib/homeCache";
+import { API_BASE } from "@/lib/apiBase";
 
 // Card dimensions — portrait 2:3 ratio
 const CARD_W = 120;
@@ -27,13 +28,7 @@ const CARD_GAP = 10;
 
 // ─── API base ─────────────────────────────────────────────────────────────────
 // Mirrors the same logic used by lib/apiClient.ts and lib/tmdb.ts.
-const _API_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : null);
-
-const RECENT_URL = _API_HOST ? `${_API_HOST}/api/stream/recent` : null;
+const RECENT_URL = API_BASE ? `${API_BASE}/stream/recent` : null;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TrendingItem {

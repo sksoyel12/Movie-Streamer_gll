@@ -24,19 +24,14 @@ import { setVpnBlocked, VpnBlockedError }            from "@/lib/vpnState";
 import { setAccountSuspended, AccountSuspendedError } from "@/lib/suspensionState";
 import { setSigningKey, clearSigningKey, signRequest } from "@/lib/requestSigner";
 import { setStreamKeyStatus }                        from "@/lib/streamKeyStatus";
+import { API_BASE }                                  from "@/lib/apiBase";
 
 // ─── API base URL ─────────────────────────────────────────────────────────────
-
-const REPLIT_API_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  `https://${process.env.EXPO_PUBLIC_DOMAIN ?? "c06a2b56-a6eb-45e9-b9a7-b40a557a3693-00-37qwb5r50yelh.pike.replit.dev"}`;
 
 export function getApiBase(): string {
   // Artifact services are exposed through the shared routed domain. Do not
   // append :8080 here: that bypasses Replit's /api proxy and fails on mobile.
-  return REPLIT_API_HOST.endsWith("/api")
-    ? REPLIT_API_HOST
-    : `${REPLIT_API_HOST}/api`;
+  return API_BASE ?? "";
 }
 
 // Platform identifier sent with every request (required by server antiBot)

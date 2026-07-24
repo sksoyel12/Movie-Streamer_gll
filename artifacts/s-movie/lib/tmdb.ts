@@ -1,3 +1,5 @@
+import { API_HOST } from "@/lib/apiBase";
+
 // TMDB v3 API key — only used as direct-call fallback when the server proxy is
 // unavailable (e.g. unit tests). Production always routes through /api/tmdb proxy.
 const API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY || process.env.EXPO_PUBLIC_TMDB_KEY || null;
@@ -7,11 +9,7 @@ const BASE = "https://api.themoviedb.org/3";
 // Route all TMDB API calls through our Replit api-server so they work even when
 // api.themoviedb.org is DNS-blocked on the user's ISP. Falls back to direct
 // TMDB calls when EXPO_PUBLIC_DOMAIN is not set (e.g. in unit tests).
-const _PROXY_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : null);
+const _PROXY_HOST = API_HOST;
 const TMDB_PROXY_BASE: string | null = _PROXY_HOST ? `${_PROXY_HOST}/api/tmdb` : null;
 const IMG_BASE = "https://image.tmdb.org/t/p";
 // Image proxy priority:

@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image, type ImageContentFit, type ImageSource } from "expo-image";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { API_HOST } from "@/lib/apiBase";
 
 // Blurhash placeholder shown while image loads
 const BLURHASH = "L02Yr=xuofj[~qj[ofj[M{j[M{j[";
@@ -26,11 +27,7 @@ const BLURHASH = "L02Yr=xuofj[~qj[ofj[M{j[M{j[";
 const WSRV   = "https://wsrv.nl/?url=";
 const WESERV = "https://images.weserv.nl/?url=";
 
-const _API_HOST =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : null);
+const _API_HOST = API_HOST;
 const SERVER_PROXY: string | null = _API_HOST ? `${_API_HOST}/api/image?url=` : null;
 
 function buildProxyUrl(directTmdbUrl: string, proxy: string, size: string): string {
