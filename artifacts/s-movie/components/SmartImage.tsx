@@ -44,14 +44,14 @@ function buildProxyUrl(directTmdbUrl: string, proxy: string, size: string): stri
 type ProxyStep = [string, string];
 
 const RETRY_CHAIN: ProxyStep[] = [
-  // Server proxy FIRST — ISP-proof, works in India (Jio/Airtel/BSNL all block TMDB)
+  [WSRV,   "w780"],    // Step 1 — Cloudflare CDN (fast ~50ms, Indian edge nodes)
+  [WSRV,   "w500"],    // Step 2 — same CDN, smaller size
+  [WESERV, "w780"],    // Step 3 — secondary CDN fallback
+  // Step 4 — Server proxy as ISP-proof last resort
   ...(SERVER_PROXY
     ? [[SERVER_PROXY, "w780"] as ProxyStep]
     : []),
-  [WSRV,   "w780"],    // Fallback 1 — Cloudflare CDN
-  [WSRV,   "w500"],    // Fallback 2 — same CDN, smaller size
-  [WESERV, "w780"],    // Fallback 3 — secondary CDN
-  // Final fallback = direct TMDB URL
+  // Final step = direct TMDB URL
 ];
 
 // 3 s per step — enough for server proxy cold-start round-trip

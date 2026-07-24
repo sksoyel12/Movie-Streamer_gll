@@ -62,6 +62,7 @@ export default function Header({ activeTab, onTabChange, hasUnread = false, scro
             <View style={styles.originalBadge}>
               <Text style={styles.brandSub}>ORIGINAL</Text>
             </View>
+            <Text style={styles.categoryLabel}>{activeTab.toUpperCase()}</Text>
           </View>
         </View>
 
@@ -192,6 +193,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 2,
     lineHeight: 12,
+    textTransform: "uppercase",
+  },
+  categoryLabel: {
+    color: "rgba(255,255,255,0.60)",
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+    fontWeight: "500",
+    letterSpacing: 1.5,
+    marginTop: 3,
     textTransform: "uppercase",
   },
   iconsRow: {

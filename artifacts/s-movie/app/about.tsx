@@ -23,6 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GOOGLE_USER_KEY } from "@/app/(tabs)/profile";
+import { getIdentity } from "@/lib/identity";
 
 /** Same key used by lib/deviceFingerprint.ts — shares the same stable UUID */
 const DEVICE_ID_KEY = "@smovie:deviceId";
@@ -182,6 +183,9 @@ export default function AboutScreen() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<DeviceData | null>(null);
   const [account, setAccount] = useState<AccountData | null>(null);
+  const [uniqueUserId, setUniqueUserId] = useState<string | null>(null);
+  const [uidCopied, setUidCopied] = useState(false);
+  const uidCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [esnCopied, setEsnCopied] = useState(false);
   const esnCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,11 +205,27 @@ export default function AboutScreen() {
           setData(d);
           setAccount(a);
           setLoading(false);
+          // Fetch server-assigned unique user ID if signed in
+          if (a.status === "signed-in") {
+            getIdentity().then((identity) => {
+              if (!cancelled && identity?.uniqueUserId) {
+                setUniqueUserId(identity.uniqueUserId);
+              }
+            }).catch(() => {});
+          }
         }
       })
       .catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  const handleCopyUid = async () => {
+    if (!uniqueUserId) return;
+    await ClipboardExpo.setStringAsync(uniqueUserId).catch(() => {});
+    setUidCopied(true);
+    if (uidCopiedTimer.current) clearTimeout(uidCopiedTimer.current);
+    uidCopiedTimer.current = setTimeout(() => setUidCopied(false), 2500);
+  };
 
   const handleCopyEsn = async () => {
     if (!data?.esn) return;
@@ -519,6 +539,25 @@ export default function AboutScreen() {
               <InfoRow label="Email"   value={account.email  ?? "—"} accent />
               <InfoRow label="Name"    value={account.name   ?? "—"} />
               <InfoRow label="Status"  value="Signed In" accent />
+              {uniqueUserId ? (
+                <Pressable
+                  onPress={handleCopyUid}
+                  style={({ pressed }) => [esnRowStyles.row, pressed && { backgroundColor: "rgba(229,9,20,0.04)" }]}
+                >
+                  <Text style={esnRowStyles.label}>User ID</Text>
+                  <View style={esnRowStyles.valueWrap}>
+                    <Text style={[esnRowStyles.value, { color: "#60A5FA" }]} numberOfLines={1} adjustsFontSizeToFit>
+                      {uniqueUserId}
+                    </Text>
+                    <View style={[esnRowStyles.copyBadge, uidCopied && esnRowStyles.copyBadgeCopied]}>
+                      <Feather name={uidCopied ? "check" : "copy"} size={11} color={uidCopied ? "#34D399" : "#555"} />
+                      <Text style={[esnRowStyles.copyText, uidCopied && { color: "#34D399" }]}>
+                        {uidCopied ? "Copied" : "Copy"}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ) : null}
             </>
           ) : (
             <InfoRow label="Account" value="Guest (not signed in)" />
