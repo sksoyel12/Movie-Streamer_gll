@@ -600,23 +600,6 @@ export default function ProfileScreen() {
                 )}
               </Pressable>
 
-              <Pressable
-                hitSlop={10}
-                onPress={async () => {
-                  await clearProfile();
-                  router.replace("/onboarding");
-                }}
-                style={({ pressed }) => [styles.editIcon, pressed && { opacity: 0.5 }]}
-              >
-                <MaterialCommunityIcons name="account-switch-outline" size={20} color="#fff" />
-              </Pressable>
-              <Pressable
-                hitSlop={10}
-                onPress={openEditModal}
-                style={({ pressed }) => [styles.editIcon, pressed && { opacity: 0.5 }]}
-              >
-                <Feather name="edit-2" size={18} color="#fff" />
-              </Pressable>
             </View>
           </View>
 
