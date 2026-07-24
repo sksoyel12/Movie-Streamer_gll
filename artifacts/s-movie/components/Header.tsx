@@ -62,7 +62,6 @@ export default function Header({ activeTab, onTabChange, hasUnread = false, scro
             <View style={styles.originalBadge}>
               <Text style={styles.brandSub}>ORIGINAL</Text>
             </View>
-            <Text style={styles.categoryLabel}>{activeTab.toUpperCase()}</Text>
           </View>
         </View>
 
