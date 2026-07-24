@@ -47,18 +47,18 @@ function buildProxyUrl(directTmdbUrl: string, proxy: string, size: string): stri
 type ProxyStep = [string, string];
 
 const RETRY_CHAIN: ProxyStep[] = [
-  [WSRV,   "w780"],    // Step 0 — Cloudflare CDN, Indian edge nodes (~50ms), w780 quality
-  [WSRV,   "w500"],    // Step 1 — same CDN, slightly smaller (cache miss fallback)
+  // Server proxy FIRST — ISP-proof, works in India (Jio/Airtel/BSNL all block TMDB)
   ...(SERVER_PROXY
-    ? [[SERVER_PROXY, "w780"] as ProxyStep]  // Step 2 — our server (ISP-proof)
+    ? [[SERVER_PROXY, "w780"] as ProxyStep]
     : []),
-  [WESERV, "w780"],    // Step 3 — secondary CDN fallback
-  // Step RETRY_CHAIN.length = direct TMDB URL (last resort)
+  [WSRV,   "w780"],    // Fallback 1 — Cloudflare CDN
+  [WSRV,   "w500"],    // Fallback 2 — same CDN, smaller size
+  [WESERV, "w780"],    // Fallback 3 — secondary CDN
+  // Final fallback = direct TMDB URL
 ];
 
-// 2.5 s per step — enough time for a cold-cache proxy round-trip to TMDB
-// (cold wsrv.nl fetch can take 1.5–2s on first request from a new edge node).
-const STEP_TIMEOUT_MS = 2_500;
+// 3 s per step — enough for server proxy cold-start round-trip
+const STEP_TIMEOUT_MS = 3_000;
 
 // ─── URI normalisation ────────────────────────────────────────────────────────
 function extractDirectUrl(raw: string | undefined): string | undefined {
