@@ -85,14 +85,6 @@ export default function Header({ activeTab, onTabChange, hasUnread = false, scro
             {hasUnread && <View style={styles.badge} />}
           </Pressable>
 
-          <Pressable
-            onPress={() => { haptic.light(); router.push("/search"); }}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.55 }]}
-            hitSlop={10}
-            accessibilityLabel="Search"
-          >
-            <Feather name="search" size={22} color="#e5e5e5" />
-          </Pressable>
         </View>
       </View>
 
@@ -196,7 +188,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   categoryLabel: {
-    color: "rgba(255,255,255,0.60)",
+    color: "rgba(255,255,255,0.65)",
     fontSize: 9,
     fontFamily: "Inter_500Medium",
     fontWeight: "500",
