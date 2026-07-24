@@ -497,15 +497,22 @@ export default function RootLayout() {
   }, []);
 
   if (!fontsLoaded && !fontError) {
-    // Show branded splash while fonts download — matches the native splash screen
-    // so there's no black flash between the native splash and the app UI.
+    // Matches the onboarding cinematic splash — small logo + wordmark on black.
     return (
-      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center", gap: 8 }}>
         <Image
-          source={require("@/assets/images/splash.png")}
-          style={{ width: "86%", height: "86%" }}
+          source={require("@/assets/images/s-logo.png")}
+          style={{ width: 130, height: 130 }}
           resizeMode="contain"
         />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <View style={{ width: 28, height: 1.5, backgroundColor: "#E50914", borderRadius: 1 }} />
+          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "900", letterSpacing: 8 }}>S-MOVIE</Text>
+          <View style={{ width: 28, height: 1.5, backgroundColor: "#E50914", borderRadius: 1 }} />
+        </View>
+        <Text style={{ color: "#E50914", fontSize: 11, fontWeight: "700", letterSpacing: 5, marginTop: 4 }}>
+          ORIGINAL
+        </Text>
       </View>
     );
   }
