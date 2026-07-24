@@ -1,7 +1,6 @@
-// TMDB v3 API key — all production calls go through our /api/tmdb server proxy
-// (set via EXPO_PUBLIC_DOMAIN). This key is only the direct-call fallback for
-// dev/test environments where no proxy is running.  Single key, single path.
-const API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY || process.env.EXPO_PUBLIC_TMDB_KEY || "352d8760f635c2200e3a64ac8ea64fb0";
+// TMDB v3 API key — only used as direct-call fallback when the server proxy is
+// unavailable (e.g. unit tests). Production always routes through /api/tmdb proxy.
+const API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY || process.env.EXPO_PUBLIC_TMDB_KEY || null;
 const BASE = "https://api.themoviedb.org/3";
 
 // ─── Server-side TMDB proxy ────────────────────────────────────────────────────
