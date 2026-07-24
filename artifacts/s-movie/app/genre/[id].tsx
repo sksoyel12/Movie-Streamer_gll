@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import SmartImage from "@/components/SmartImage";
+import DynamicPoster from "@/components/DynamicPoster";
 import { GENRE_BY_ID, GROUP_BY_ID } from "@/lib/genreData";
 import { tmdbToCard, type TMDBMovie } from "@/lib/tmdb";
 
@@ -30,6 +31,7 @@ const CARD_H = Math.round(CARD_W * 1.5);
 
 interface GridItem {
   id: string;
+  tmdbId: number;
   title: string;
   poster: { uri: string } | null;
   year: number;
@@ -41,6 +43,7 @@ function toGridItem(m: TMDBMovie): GridItem {
   const card = tmdbToCard(m);
   return {
     id: card.id,
+    tmdbId: card.tmdbId,
     title: card.title,
     poster: card.poster,
     year: card.year,
@@ -130,8 +133,10 @@ export default function GenreResultsScreen() {
           pressed && { opacity: 0.75, transform: [{ scale: 0.96 }] },
         ]}
       >
-        <SmartImage
-          source={item.poster}
+        <DynamicPoster
+          tmdbId={item.tmdbId}
+          mediaType={item.mediaType}
+          fallback={item.poster}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           recyclingKey={item.id}
@@ -148,9 +153,6 @@ export default function GenreResultsScreen() {
         </View>
         <View style={st.cardBottom}>
           <Text style={st.cardTitle} numberOfLines={2}>{item.title}</Text>
-          {item.rating > 0 && (
-            <Text style={st.cardRating}>{item.rating.toFixed(1)}</Text>
-          )}
         </View>
       </Pressable>
     );

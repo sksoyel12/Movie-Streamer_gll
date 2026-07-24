@@ -16,6 +16,7 @@ import { prefetchStream } from "@/lib/backgroundPrefetch";
 import { getLockedHomePosterUri } from "@/lib/posterAlgorithm";
 import { scoreAndSortByGemini } from "@/lib/geminiScore";
 import { fetchMoviePosters, tmdbOriginal } from "@/lib/tmdb";
+import { scoreForUser, type UserPrefs } from "@/lib/userPreferences";
 
 // Splits "👍 Some Title" → { emoji: "👍 ", text: "Some Title" }
 // Needed because Inter font has no emoji glyphs — emoji must render in system font.
@@ -218,6 +219,9 @@ interface Props {
    * string label (e.g. "trending", "becauseYouLiked") to enable AI sorting.
    */
   geminiRowId?: string;
+  /** Apply the signed-in/guest profile before the optional Gemini re-rank. */
+  personalized?: boolean;
+  userPrefs?: UserPrefs | null;
 }
 
 
@@ -288,6 +292,7 @@ function mapResults(results: TMDBPage["results"]): CardItem[] {
         first_air_date:  (m as any).first_air_date,
         last_air_date:   (m as any).last_air_date,
         popularity:      m.popularity,
+        genreIds:        m.genre_ids ?? [],
       } as CardItem;
     });
 }
@@ -519,6 +524,8 @@ export default function MovieRow({
   imageMode = "poster",
   sortByPopularity = false,
   geminiRowId,
+  personalized = false,
+  userPrefs,
 }: Props) {
   const [movies, setMovies] = useState<CardItem[]>(initialMovies);
   const [initialLoading, setInitialLoading] = useState(Boolean(tmdbFetcher || hdhubFetcher));
@@ -601,6 +608,13 @@ export default function MovieRow({
           const cards: CardItem[] = sortByPopularity
             ? stamped
             : weightedShuffleByPopularity<CardItem>(stamped);
+          const locallyPersonalized = personalized && userPrefs
+            ? [...cards].sort((a, b) => {
+                const scoreA = scoreForUser(userPrefs, a.tmdbId ?? a.id, (a as any).genreIds);
+                const scoreB = scoreForUser(userPrefs, b.tmdbId ?? b.id, (b as any).genreIds);
+                return (scoreB - scoreA) || ((b.popularity ?? 0) - (a.popularity ?? 0));
+              })
+            : cards;
 
           // ── Cross-row deduplication with multi-page fallback ─────────────
           // Many TMDB endpoints share popular titles (e.g. "Teach You A Lesson"
@@ -611,8 +625,8 @@ export default function MovieRow({
           const MAX_DEDUP_PAGES = 4;
 
           let uniqueCards: typeof cards = seenIds
-            ? cards.filter((c) => !seenIds.current.has(c.id))
-            : cards;
+            ? locallyPersonalized.filter((c) => !seenIds.current.has(c.id))
+            : locallyPersonalized;
 
           let dedupPage = 1;
           let lastPageData = data;
@@ -652,7 +666,7 @@ export default function MovieRow({
             // score each item and re-sort by personalised engagement score.
             // Fire-and-forget — never blocks the initial render.
             if (geminiRowId) {
-              scoreAndSortByGemini(toShow as any[], geminiRowId).then((sorted) => {
+              scoreAndSortByGemini(toShow as any[], geminiRowId, userPrefs ?? undefined).then((sorted) => {
                 if (!cancelled && mountedRef.current) setMovies(sorted as CardItem[]);
               }).catch(() => {});
             }
@@ -700,7 +714,7 @@ export default function MovieRow({
   // refreshKey is the intentional re-fetch trigger; loadDelay and title are stable.
   // tmdbFetcher/hdhubFetcher are intentionally excluded — we read them via ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey, loadDelay]);
+  }, [refreshKey, loadDelay, personalized, userPrefs]);
 
   const loadMore = useCallback(async () => {
     const tFetcher = tmdbFetcherRef.current;

@@ -94,6 +94,7 @@ export default function HomeScreen() {
     topGenres,
     personalImageMode,
     personalRowTitle,
+    prefs,
     ready: prefsReady,
   } = useUserPreferences();
 
@@ -290,6 +291,8 @@ export default function HomeScreen() {
               seenIds={seenIds}
               refreshKey={rowRefreshKey}
               imageMode={personalImageMode}
+              personalized
+              userPrefs={prefs}
             />
           ) : null;
 
@@ -346,6 +349,7 @@ export default function HomeScreen() {
                 refreshKey={rowRefreshKey}
                 imageMode={cat.imageMode}
                 geminiRowId={geminiRowId}
+                userPrefs={prefs}
               />
             </React.Fragment>
           );

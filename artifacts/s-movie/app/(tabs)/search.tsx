@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import SmartImage from "@/components/SmartImage";
+import DynamicPoster from "@/components/DynamicPoster";
 import { useColors } from "@/hooks/useColors";
 import { tmdb, tmdbImg, type TMDBMovie } from "@/lib/tmdb";
 
@@ -20,6 +21,7 @@ type MediaType = "movie" | "tv";
 
 interface SearchItem {
   id: string;
+  tmdbId: number;
   title: string;
   mediaType: MediaType;
   posterPath: string | null;
@@ -41,6 +43,7 @@ function getTitle(item: TMDBMovie): string {
 function toSearchItem(item: TMDBMovie): SearchItem {
   return {
     id: `${getMediaType(item)}-${item.id}`,
+    tmdbId: item.id,
     title: getTitle(item),
     mediaType: getMediaType(item),
     posterPath: item.poster_path,
@@ -250,8 +253,10 @@ export default function SearchTabScreen() {
           ]}
         >
           {posterUri ? (
-            <SmartImage
-              source={{ uri: posterUri }}
+            <DynamicPoster
+              tmdbId={item.tmdbId}
+              mediaType={item.mediaType}
+              fallback={posterUri ? { uri: posterUri } : null}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
               cachePolicy="disk"

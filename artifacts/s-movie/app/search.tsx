@@ -19,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { tmdb, tmdbImg, tmdbToCard, type TMDBMovie } from "@/lib/tmdb";
 import { ALL_MOVIES, type Movie } from "@/data/movies";
+import DynamicPoster from "@/components/DynamicPoster";
+import { trackSearchQuery } from "@/lib/userPreferences";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const NUM_COLUMNS = 3;
@@ -278,6 +280,7 @@ export default function SearchScreen() {
 
   const onPressResult = (item: SearchResult) => {
     addHistory(item.title);
+    trackSearchQuery(item.title).catch(() => {});
     router.push({
       pathname: "/movie/[id]",
       params: {
@@ -308,8 +311,10 @@ export default function SearchScreen() {
         ]}
       >
         {item.poster?.uri ? (
-          <SmartImage
-            source={{ uri: item.poster.uri.replace(/\/w\d+\//, "/w500/") }}
+          <DynamicPoster
+            tmdbId={item.tmdbId}
+            mediaType={item.mediaType}
+            fallback={{ uri: item.poster.uri.replace(/\/w\d+\//, "/w500/") }}
             style={[styles.gridPoster, comingSoon && { opacity: 0.55 }]}
             contentFit="cover"
             transition={300}
@@ -342,11 +347,6 @@ export default function SearchScreen() {
           <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
           <View style={styles.gridMeta}>
             <Text style={styles.gridYear}>{item.year}</Text>
-            {item.rating > 0 && !comingSoon && (
-              <View style={styles.gridRatingBadge}>
-                <Text style={styles.gridRatingText}>{item.rating.toFixed(1)}</Text>
-              </View>
-            )}
           </View>
         </View>
       </Pressable>
@@ -383,7 +383,6 @@ export default function SearchScreen() {
             </Text>
           </View>
           <Text style={styles.trendYear}>{item.year}</Text>
-          {item.rating > 0 && <Text style={styles.trendRating}>{item.rating.toFixed(1)}</Text>}
         </View>
       </View>
       <Feather name="chevron-right" size={17} color="#2a2a2a" />

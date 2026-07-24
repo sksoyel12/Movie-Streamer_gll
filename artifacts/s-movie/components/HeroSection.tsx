@@ -26,14 +26,6 @@ interface Props {
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_H * 0.70);
 
-function getRatingColor(rating: string): string {
-  if (!rating) return "#737373";
-  const r = rating.toUpperCase();
-  if (r === "18+" || r === "A" || r === "R") return "#0EA5E9";
-  if (r === "16+" || r === "PG-13") return "#F59E0B";
-  return "#34D399";
-}
-
 export default function HeroSection({ movie, onColorChange }: Props) {
   const { isInList, toggle } = useMyList();
   const inList = isInList(movie.id);
@@ -85,10 +77,8 @@ export default function HeroSection({ movie, onColorChange }: Props) {
   };
 
   const genres = movie.genres?.slice(0, 3) ?? [];
-  const rating = movie.rating ?? "HD";
   const duration = movie.duration && movie.duration !== "—" ? movie.duration : null;
   const year = movie.year;
-  const tmdbRating = (movie as any).tmdbRating;
 
   return (
     <Pressable onPress={handleInfo} style={styles.container}>
@@ -152,22 +142,6 @@ export default function HeroSection({ movie, onColorChange }: Props) {
           ) : null}
 
           {duration ? <View style={styles.dot} /> : null}
-
-          {/* Rating badge */}
-          <View style={[styles.ratingBadge, { borderColor: getRatingColor(rating) }]}>
-            <Text style={[styles.ratingText, { color: getRatingColor(rating) }]}>{rating}</Text>
-          </View>
-
-          {/* TMDB score */}
-          {tmdbRating && tmdbRating > 0 ? (
-            <>
-              <View style={styles.dot} />
-              <View style={styles.imdbBadge}>
-                <Text style={styles.imdbLabel}>★</Text>
-                <Text style={styles.imdbScore}>{Number(tmdbRating).toFixed(1)}</Text>
-              </View>
-            </>
-          ) : null}
 
           {/* Genre pills */}
           {genres.map((g) => (

@@ -51,7 +51,10 @@ import { pickHindiFromVideos } from "@/lib/hindi-trailer";
 import { searchHindiTrailer, searchYouTubeTrailer } from "@/lib/youtube";
 import { loadProgress } from "@/lib/watchProgress";
 import { addToWatchHistory } from "@/lib/watchHistory";
-import { trackContentView } from "@/lib/userPreferences";
+import {
+  trackContentView,
+  trackContentFeedback,
+} from "@/lib/userPreferences";
 import { STREAM_SOURCES } from "../../src/utils/streamConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchMovieLinks, type MovieLinks } from "@/lib/movieLinks";
@@ -251,8 +254,6 @@ export default function MovieDetail() {
   const [watchProviders, setWatchProviders] = useState<Array<{ logo_path: string; provider_name: string; provider_id: number }>>([]);
   // IMDb external ID for linking
   const [imdbId, setImdbId] = useState<string | null>(null);
-  // Localized content rating (e.g. "U/A 13+", "A", "TV-MA")
-  const [contentRating, setContentRating] = useState<string | null>(null);
   // Movie franchise / collection data
   const [collectionData, setCollectionData] = useState<{
     id: number; name: string; overview: string;
@@ -712,28 +713,6 @@ export default function MovieDetail() {
       })
       .catch(() => {});
 
-    // Content rating — IN region preferred, fallback US
-    if (mt === "tv") {
-      tmdbGet<{ results: Array<{ iso_3166_1: string; rating: string }> }>(
-        `/${mt}/${numericTmdbId}/content_ratings`,
-      ).then((data) => {
-        if (cancelled) return;
-        const ratings = data?.results ?? [];
-        const r = ratings.find((x) => x.iso_3166_1 === "IN") ?? ratings.find((x) => x.iso_3166_1 === "US");
-        if (r?.rating) setContentRating(r.rating);
-      }).catch(() => {});
-    } else {
-      tmdbGet<{ results: Array<{ iso_3166_1: string; release_dates: Array<{ certification: string }> }> }>(
-        `/${mt}/${numericTmdbId}/release_dates`,
-      ).then((data) => {
-        if (cancelled) return;
-        const results = data?.results ?? [];
-        const r = results.find((x) => x.iso_3166_1 === "IN") ?? results.find((x) => x.iso_3166_1 === "US");
-        const cert = r?.release_dates?.find((d) => d.certification)?.certification;
-        if (cert) setContentRating(cert);
-      }).catch(() => {});
-    }
-
     return () => { cancelled = true; };
   }, [numericTmdbId, isTV]);
 
@@ -861,6 +840,8 @@ export default function MovieDetail() {
         await AsyncStorage.removeItem(`smovie_rating_${id}`);
       }
     } catch { }
+    const genreIds = (tmdbDetail?.genres ?? []).map((genre) => genre.id);
+    trackContentFeedback(movie?.id ?? id ?? "", genreIds, type).catch(() => {});
   }, [userRating, id]);
 
   // Trigger playback for episodes and the main Play button
@@ -1123,9 +1104,6 @@ export default function MovieDetail() {
           {/* Metadata row */}
           <View style={styles.metaRow}>
             {movie?.year ? <Text style={styles.metaYear}>{movie.year}</Text> : null}
-            <View style={styles.ratingPill}>
-              <Text style={styles.ratingText}>{contentRating ?? movie?.rating ?? "A"}</Text>
-            </View>
             {durationLabel ? <Text style={styles.metaDur}>{durationLabel}</Text> : null}
             <View style={styles.metaBadge}><Text style={styles.metaBadgeText}>HD</Text></View>
             <View style={styles.metaBadge}><Text style={styles.metaBadgeText}>CC</Text></View>
@@ -1467,7 +1445,6 @@ export default function MovieDetail() {
                               <View style={styles.collectionMeta}>
                                 <Text style={styles.collectionTitle} numberOfLines={2}>{part.title}</Text>
                                 <Text style={styles.collectionYear}>{year}</Text>
-                                {part.vote_average > 0 && <Text style={styles.collectionRating}>★ {part.vote_average.toFixed(1)}</Text>}
                                 {part.overview ? <Text style={styles.collectionDesc} numberOfLines={2}>{part.overview}</Text> : null}
                               </View>
                               <Feather name="chevron-right" size={18} color="#404040" />
@@ -1507,13 +1484,6 @@ export default function MovieDetail() {
                           }}
                         >
                           <SmartImage source={rec.poster ?? require("@/assets/images/hero.png")} style={styles.recPoster} contentFit="cover" transition={300} cachePolicy="memory-disk" />
-                          {rec.tmdbRating > 0 && (
-                            <View style={styles.recRatingBadge}>
-                              <Text style={styles.recRatingText}>
-                                {rec.tmdbRating.toFixed(1)}
-                              </Text>
-                            </View>
-                          )}
                           <Text style={styles.recTitle} numberOfLines={2}>
                             {rec.title}
                           </Text>

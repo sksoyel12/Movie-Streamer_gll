@@ -32,6 +32,8 @@ export interface UserPrefs {
   updatedAt:     number;
 }
 
+export type FeedbackKind = "down" | "up" | "love";
+
 const DEFAULT_PREFS: UserPrefs = {
   genreWeights: {},
   contentViews: {},
@@ -153,6 +155,69 @@ export async function trackSearchQuery(query: string): Promise<void> {
     prefs.updatedAt = Date.now();
     await savePrefs(prefs);
   } catch {}
+}
+
+/**
+ * Private Netflix-style feedback signal. It is never displayed as a score;
+ * it only changes the user's future recommendations.
+ */
+export async function trackContentFeedback(
+  contentId: string,
+  genreIds: number[],
+  feedback: FeedbackKind,
+): Promise<void> {
+  try {
+    const prefs = await loadPrefs();
+    const genreMultiplier = feedback === "down" ? -3 : feedback === "love" ? 4 : 2;
+    for (const genreId of genreIds) {
+      prefs.genreWeights[genreId] = (prefs.genreWeights[genreId] ?? 0) + genreMultiplier;
+    }
+    const previous = prefs.contentViews[contentId] ?? {
+      views: 0,
+      totalCompletion: 0,
+      lastViewed: Date.now(),
+      genreIds,
+    };
+    prefs.contentViews[contentId] = {
+      ...previous,
+      genreIds,
+      lastViewed: Date.now(),
+      totalCompletion: Math.max(
+        0,
+        previous.totalCompletion +
+          (feedback === "down" ? -0.35 : feedback === "love" ? 0.75 : 0.35),
+      ),
+    };
+    prefs.updatedAt = Date.now();
+    await savePrefs(prefs);
+  } catch {}
+}
+
+/**
+ * Local ranking layer used even without an AI key. It combines genre affinity,
+ * repeat interest, completion and recency before the optional Gemini re-rank.
+ */
+export function scoreForUser(
+  prefs: UserPrefs | null | undefined,
+  contentId: string | number,
+  genreIds: number[] = [],
+): number {
+  if (!prefs) return 0;
+  const content = prefs.contentViews[String(contentId)];
+  const genreScore = genreIds.reduce(
+    (sum, genreId) => sum + (prefs.genreWeights[genreId] ?? 0),
+    0,
+  );
+  const historyScore = content
+    ? content.totalCompletion * 5 + content.views * 0.5
+    : 0;
+  const recencyScore = content
+    ? Math.max(
+        0,
+        1 - (Date.now() - content.lastViewed) / (14 * 24 * 60 * 60 * 1000),
+      )
+    : 0;
+  return genreScore * 2 + historyScore + recencyScore;
 }
 
 // ─── Computation API ──────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@
  *  • Graceful degradation — if Gemini is unavailable or unkeyed, original order is kept.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { UserPrefs } from "@/lib/userPreferences";
 
 const GEMINI_KEY  = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
 const GEMINI_URL  =
@@ -43,7 +44,7 @@ export async function scoreAndSortByGemini<T extends {
   title?:  string;
   genres?: string[];
   synopsis?: string;
-}>(items: T[], rowId: string): Promise<T[]> {
+}>(items: T[], rowId: string, prefs?: UserPrefs): Promise<T[]> {
   if (!GEMINI_KEY || items.length === 0) return items;
 
   const ids      = items.map((m) => Number(m.tmdbId ?? 0)).filter(Boolean);
@@ -66,9 +67,20 @@ export async function scoreAndSortByGemini<T extends {
     desc:   (m.synopsis ?? "").slice(0, 100),
   }));
 
+  const profile = prefs
+    ? `User genre weights: ${JSON.stringify(prefs.genreWeights)}. Recently viewed IDs: ${
+        Object.entries(prefs.contentViews)
+          .sort(([, a], [, b]) => b.lastViewed - a.lastViewed)
+          .slice(0, 8)
+          .map(([id]) => id)
+          .join(", ")
+      }.\n`
+    : "No viewing history is available; use a balanced cold-start ranking.\n";
   const prompt =
-    "You are a Netflix recommendation algorithm. Score each title by engagement " +
-    "potential for a general audience (0-100). Higher = more likely to be watched.\n" +
+    "You are a Netflix recommendation algorithm. Score each title for this specific " +
+    "user (0-100), using genre affinity, recent viewing, completion behavior and " +
+    "fresh discovery. Do not use public ratings as a visible output.\n" +
+    profile +
     "Respond ONLY with a compact JSON array — no markdown, no explanation:\n" +
     '[{"id":<tmdbId>,"score":<0-100>}]\n\n' +
     "Titles:\n" + JSON.stringify(payload);

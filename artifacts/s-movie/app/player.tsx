@@ -37,6 +37,7 @@ import { findMovie, PLAYABLE_VIDEO_URL } from "@/data/movies";
 import { haptic } from "@/lib/haptics";
 import { tmdb, tmdbImg, proxyUrl, type TMDBEpisode, type TMDBDetail } from "@/lib/tmdb";
 import { loadProgress, saveProgress } from "@/lib/watchProgress";
+import { trackWatchCompletion } from "@/lib/userPreferences";
 import {
   getDownloadRecord,
   deleteDownload as deleteDownloadFile,
@@ -243,6 +244,9 @@ export default function PlayerScreen() {
           ? (movie.poster as { uri: string }).uri
           : undefined,
     });
+    if (positionSec / durationSec >= 0.8) {
+      void trackWatchCompletion(id, [], positionSec / durationSec);
+    }
   }, [id, movie?.poster, movie?.title, title_param]);
 
   useEffect(() => {
@@ -481,6 +485,9 @@ export default function PlayerScreen() {
           initialEpisode={currentEpisode}
           onTimeout={tryNextSource}
           onEnded={() => nextEp && setAutoplayCountdown(5)}
+          onCompletion={() => {
+            if (id) void trackWatchCompletion(id, [], 1);
+          }}
           seasons={seasons}
           episodes={episodes}
           prevEpisode={prevEp}
@@ -544,6 +551,7 @@ function NativePlayerScreen({
   initialEpisode,
   onTimeout,
   onEnded,
+  onCompletion,
   seasons,
   episodes,
   prevEpisode,
@@ -563,6 +571,7 @@ function NativePlayerScreen({
   initialEpisode: number;
   onTimeout?: () => void;
   onEnded?: () => void;
+  onCompletion?: () => void;
   seasons: any[];
   episodes: TMDBEpisode[];
   prevEpisode: { season: number; episode: number } | null;
@@ -734,10 +743,13 @@ function NativePlayerScreen({
   // ─── Player event listeners ───────────────────────────────────────────────────
   useEffect(() => {
     const subStatus = player.addListener("statusChange", (e: any) => {
-      if ((player.status as string) === "finished") onEnded?.();
+      if ((player.status as string) === "finished") {
+        onCompletion?.();
+        onEnded?.();
+      }
     });
     return () => subStatus.remove();
-  }, [player, onEnded]);
+  }, [player, onEnded, onCompletion]);
 
   useEffect(() => {
     try { player.volume = volume; } catch { }

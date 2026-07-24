@@ -312,16 +312,9 @@ const ClipCard = React.memo(function ClipCard({ item, isVisible, isAdjacent }: C
         {/* Title */}
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
-        {/* Meta: year · rating */}
+        {/* Meta: year */}
         <View style={styles.metaRow}>
           {item.year ? <Text style={styles.metaText}>{item.year}</Text> : null}
-          {item.rating > 0 && (
-            <>
-              <View style={styles.dot} />
-              <Ionicons name="star" size={11} color="#FBBF24" />
-              <Text style={styles.metaText}>{item.rating.toFixed(1)}</Text>
-            </>
-          )}
         </View>
 
         {/* Overview */}
