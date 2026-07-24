@@ -500,11 +500,11 @@ export default function RootLayout() {
     // Show branded splash while fonts download — matches the native splash screen
     // so there's no black flash between the native splash and the app UI.
     return (
-      <View style={{ flex: 1, backgroundColor: "#0a1628", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
         <Image
           source={require("@/assets/images/splash.png")}
-          style={{ width: "100%", height: "100%", position: "absolute" }}
-          resizeMode="cover"
+          style={{ width: "86%", height: "86%" }}
+          resizeMode="contain"
         />
       </View>
     );

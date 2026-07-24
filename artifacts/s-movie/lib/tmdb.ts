@@ -301,6 +301,7 @@ export interface TMDBDetail {
   backdrop_path: string | null;
   vote_average: number;
   genres: { id: number; name: string }[];
+  networks?: { id: number; name: string }[];
   runtime?: number;
   episode_run_time?: number[];
   seasons?: TMDBSeason[];
@@ -427,6 +428,29 @@ export const tmdb = {
       "primary_release_date.gte": new Date().toISOString().split("T")[0],
     }),
 
+  /** Netflix TV titles scheduled for a future release. */
+  netflixComingSoonTV: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/discover/tv", {
+      page,
+      with_networks: 213,
+      sort_by: "first_air_date.asc",
+      "first_air_date.gte": TODAY,
+      "vote_count.gte": 1,
+    }),
+
+  /**
+   * Weekly trending feed requested by the New & Hot screen.
+   * TMDB's trending endpoint is a global feed, so the Netflix constraint is
+   * passed through for proxy/API implementations that support it; the screen
+   * still limits the visible feed to TV titles with Netflix metadata.
+   */
+  netflixTrending: (page = 1): Promise<TMDBPage> =>
+    get<TMDBPage>("/trending/all/week", {
+      page,
+      with_networks: 213,
+      region: "IN",
+    }),
+
   onTheAir: (page = 1): Promise<TMDBPage> =>
     get<TMDBPage>("/tv/on_the_air", { page }),
 
@@ -438,6 +462,17 @@ export const tmdb = {
 
   detail: (type: "movie" | "tv", id: number): Promise<TMDBDetail> =>
     get<TMDBDetail>(`/${type}/${id}`),
+
+  watchProviders: (
+    type: "movie" | "tv",
+    id: number,
+  ): Promise<{
+    results?: Record<string, {
+      flatrate?: Array<{ provider_id: number; provider_name: string }>;
+      buy?: Array<{ provider_id: number; provider_name: string }>;
+      rent?: Array<{ provider_id: number; provider_name: string }>;
+    }>;
+  }> => get(`/${type}/${id}/watch/providers`),
 
   /** GET /movie|tv/{id}/translations — used to check which audio/text
    *  languages (e.g. "hi" for Hindi) actually exist for a title. */
