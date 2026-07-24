@@ -21,6 +21,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -47,6 +48,8 @@ import {
 import { useDownloads } from "@/contexts/DownloadContext";
 import { getDirectStream } from "@/lib/streamingService";
 import { fetchMovieLinks, fetchEpisodeLink } from "@/lib/movieLinks";
+import { getAccountSuspended, addSuspensionListener } from "@/lib/suspensionState";
+import { getIdentity } from "@/lib/identity";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,6 +123,24 @@ export default function PlayerScreen() {
 
   const { width: winW, height: winH } = useWindowDimensions();
   const isPortraitWeb = Platform.OS === "web" && winH > winW;
+
+  // ─── Suspension gate ─────────────────────────────────────────────────────────
+  const [suspended, setSuspended] = useState<{ reason: string } | null>(getAccountSuspended());
+  const [suspensionChecked, setSuspensionChecked] = useState(false);
+
+  useEffect(() => {
+    // Check identity API for suspension status on mount
+    getIdentity().then((identity) => {
+      if (identity?.isSuspended) {
+        setSuspended({ reason: identity.suspensionReason ?? "Your account has been suspended." });
+      }
+      setSuspensionChecked(true);
+    }).catch(() => setSuspensionChecked(true));
+
+    // Also listen for runtime suspension signals from apiClient
+    const unsub = addSuspensionListener((info) => setSuspended(info));
+    return () => unsub();
+  }, []);
 
   const [orientationLocked, setOrientationLocked] = useState(false);
   const [streamResult, setStreamResult] = useState<{
@@ -402,6 +423,51 @@ export default function PlayerScreen() {
       Alert.alert("Playback Error", "None of the available sources are responding. Please try again later.");
     }
   };
+
+  // ─── Suspension check — block all playback ───────────────────────────────────
+  if (suspended) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }]}>
+        <View style={{
+          backgroundColor: "#0f172a",
+          borderRadius: 24,
+          padding: 28,
+          width: "100%",
+          maxWidth: 380,
+          borderWidth: 1,
+          borderColor: "#1e293b",
+          alignItems: "center",
+        }}>
+          <View style={{ backgroundColor: "rgba(239,68,68,0.12)", borderRadius: 50, padding: 18, marginBottom: 18 }}>
+            <Ionicons name="ban" size={48} color="#EF4444" />
+          </View>
+          <Text style={{ color: "#f8fafc", fontSize: 20, fontWeight: "700", textAlign: "center", marginBottom: 10 }}>
+            Account Suspended
+          </Text>
+          <Text style={{ color: "#94a3b8", fontSize: 14, lineHeight: 22, textAlign: "center", marginBottom: 8 }}>
+            {suspended.reason}
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 13, lineHeight: 20, textAlign: "center", marginBottom: 24 }}>
+            Movies aur series tab tak nahi chalenge jab tak account restore nahi hota.{"\n\n"}
+            Help Center se contact karo — account theek hone ke baad app wapas kaam karega.
+          </Text>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#E50914", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, marginBottom: 12, alignSelf: "stretch", justifyContent: "center" }}
+            onPress={() => Linking.openURL("mailto:wftis.aryux07@gmail.com?subject=Account%20Suspended%20-%20Help%20Center").catch(() => {})}
+          >
+            <Ionicons name="mail-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Help Center Contact Karo</Text>
+          </Pressable>
+          <Pressable style={{ paddingVertical: 10 }} onPress={() => router.back()}>
+            <Text style={{ color: "#64748b", fontSize: 13, fontWeight: "600" }}>Wapas Jao</Text>
+          </Pressable>
+          <Text style={{ color: "#475569", fontSize: 11, textAlign: "center", marginTop: 8 }}>
+            Support 24–48 hours mein reply karta hai.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   // ─── Auth loading screen ──────────────────────────────────────────────────────
   if (!authChecked) {

@@ -41,9 +41,29 @@ interface DeviceData {
   model: string;
   cpuArch: string;
   esn: string;
+  deviceModelId: string;
   isRealDevice: boolean;
   freeStorageBytes: number;
   totalStorageBytes: number;
+}
+
+/** Generate stable 11-digit numeric ID from phone brand + model + deviceId */
+function generateDeviceModelId(brand: string, model: string, deviceId: string): string {
+  const raw = `${brand}|${model}|${deviceId}`;
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) {
+    h = ((h << 5) + h) ^ raw.charCodeAt(i);
+    h = h >>> 0; // keep 32-bit unsigned
+  }
+  // Second pass for better distribution
+  let h2 = 0x811c9dc5;
+  for (let i = 0; i < raw.length; i++) {
+    h2 ^= raw.charCodeAt(i);
+    h2 = (h2 * 0x01000193) >>> 0;
+  }
+  // Combine both hashes into 11 digits
+  const combined = String(h).padStart(6, "0").slice(0, 6) + String(h2).padStart(5, "0").slice(0, 5);
+  return combined;
 }
 
 interface AccountData {
@@ -145,6 +165,8 @@ async function loadDeviceData(): Promise<DeviceData> {
     } catch {}
   }
 
+  const deviceModelId = generateDeviceModelId(brand, model, deviceId);
+
   return {
     appVersion,
     buildNumber,
@@ -154,6 +176,7 @@ async function loadDeviceData(): Promise<DeviceData> {
     model,
     cpuArch,
     esn,
+    deviceModelId,
     isRealDevice: Device.isDevice ?? false,
     freeStorageBytes,
     totalStorageBytes,
@@ -186,6 +209,8 @@ export default function AboutScreen() {
   const [uniqueUserId, setUniqueUserId] = useState<string | null>(null);
   const [uidCopied, setUidCopied] = useState(false);
   const uidCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [modelIdCopied, setModelIdCopied] = useState(false);
+  const modelIdCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [esnCopied, setEsnCopied] = useState(false);
   const esnCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -499,6 +524,32 @@ export default function AboutScreen() {
               <InfoRow label="OS API Level"    value={data?.osApiLevel ?? "—"} />
               <InfoRow label="Build Number"    value={`#${data?.buildNumber ?? "—"}`} />
               <InfoRow label="CPU Arch"        value={data?.cpuArch ?? "—"} />
+
+              {/* Device Model ID — 11-digit stable ID based on phone model */}
+              {data?.deviceModelId ? (
+                <Pressable
+                  onPress={async () => {
+                    await ClipboardExpo.setStringAsync(data.deviceModelId).catch(() => {});
+                    setModelIdCopied(true);
+                    if (modelIdCopiedTimer.current) clearTimeout(modelIdCopiedTimer.current);
+                    modelIdCopiedTimer.current = setTimeout(() => setModelIdCopied(false), 2500);
+                  }}
+                  style={({ pressed }) => [esnRowStyles.row, pressed && { backgroundColor: "rgba(229,9,20,0.04)" }]}
+                >
+                  <Text style={esnRowStyles.label}>Device ID</Text>
+                  <View style={esnRowStyles.valueWrap}>
+                    <Text style={[esnRowStyles.value, { color: "#60A5FA", letterSpacing: 1.5, fontSize: 15 }]} numberOfLines={1}>
+                      {data.deviceModelId}
+                    </Text>
+                    <View style={[esnRowStyles.copyBadge, modelIdCopied && esnRowStyles.copyBadgeCopied]}>
+                      <Feather name={modelIdCopied ? "check" : "copy"} size={11} color={modelIdCopied ? "#34D399" : "#555"} />
+                      <Text style={[esnRowStyles.copyText, modelIdCopied && { color: "#34D399" }]}>
+                        {modelIdCopied ? "Copied" : "Copy"}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ) : null}
 
               {/* ESN — tappable to copy */}
               <Pressable
