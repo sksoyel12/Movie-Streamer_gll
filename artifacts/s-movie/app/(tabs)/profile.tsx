@@ -70,7 +70,7 @@ import {
   type VersionInfo,
 } from "@/lib/appUpdate";
 import { registerForPushNotificationsAsync } from "@/lib/notifications";
-import { triggerLogoutEmail, triggerLoginNotification } from "@/lib/emailTriggers";
+import { triggerLogoutEmail, triggerLoginNotification, triggerWelcomeEmail } from "@/lib/emailTriggers";
 
 const PUSH_TOKEN_KEY = "smovie_push_token";
 const NOTIF_ENABLED_KEY = "smovie_notifications_enabled";
@@ -377,6 +377,8 @@ export default function ProfileScreen() {
       await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
       setShowAuthModal(false);
       showToast("Your account was created successfully.", "ok");
+      // Fire welcome email to the USER's email (not EMAIL_USER)
+      triggerWelcomeEmail(result.user.email ?? email, name);
     } catch (errorValue) {
       const code = (errorValue as { code?: string })?.code ?? "";
       showToast(
