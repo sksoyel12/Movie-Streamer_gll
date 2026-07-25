@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/smovie-download/"
+title = "S-Movie — Download Page"
+version = "1.0.0"
+id = "artifacts/smovie-download"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/smovie-download/" ]
+localPort = 21381
+
+[services.development]
+run = "pnpm --filter @workspace/smovie-download run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/smovie-download", "run", "build" ]
+publicDir = "artifacts/smovie-download/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21381"
+BASE_PATH = "/smovie-download/"
