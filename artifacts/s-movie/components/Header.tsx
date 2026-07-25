@@ -252,11 +252,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderWidth: 0,
   },
   pillActive: {
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "#FFFFFF",
     borderWidth: 0,
   },
   pillText: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   pillTextActive: {
-    color: "#FFFFFF",
+    color: "#000000",
     fontFamily: "Inter_700Bold",
     fontWeight: "700",
   },
