@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
-import { triggerWelcomeEmail, isFirstTimeUser } from "@/lib/welcomeEmail";
+import { triggerWelcomeEmail, triggerLoginNotification, isFirstTimeUser } from "@/lib/emailTriggers";
 
 export const PROFILE_KEY = "smovie_selected_profile";
 export const CUSTOM_KEY = "smovie_profile_customs";
@@ -130,11 +130,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         AsyncStorage.removeItem(AUTH_USER_KEY).catch(() => {});
 
-        // Send a welcome email only on the very first sign-in.
-        // Firebase sets creationTime === lastSignInTime exclusively for new accounts.
-        // triggerWelcomeEmail is fire-and-forget — it never throws or blocks the flow.
-        if (user.email && isFirstTimeUser(user.metadata)) {
-          triggerWelcomeEmail(user.email);
+        // Email triggers — all fire-and-forget, never block the auth flow.
+        // Firebase sets creationTime === lastSignInTime exclusively for brand-new accounts.
+        if (user.email) {
+          if (isFirstTimeUser(user.metadata)) {
+            // First-ever sign-in → welcome email
+            triggerWelcomeEmail(user.email, user.displayName);
+          } else {
+            // Returning user → login notification / security alert
+            triggerLoginNotification(user.email, user.displayName);
+          }
         }
       } else {
         AsyncStorage.removeItem(AUTH_USER_KEY).catch(() => {});
