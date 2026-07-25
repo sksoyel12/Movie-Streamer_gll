@@ -36,7 +36,9 @@ import { getVIPStatus } from "@/lib/subscription";
 import { haptic } from "@/lib/haptics";
 import { saveFeedback } from "@/lib/movieLinks";
 import {
+  FacebookAuthProvider,
   GoogleAuthProvider,
+  TwitterAuthProvider,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithPopup,
@@ -93,6 +95,7 @@ export default function ProfileScreen() {
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [registeringPush, setRegisteringPush] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [profileHasNewVersion, setProfileHasNewVersion] = useState(false);
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showWatchHistoryModal, setShowWatchHistoryModal] = useState(false);
@@ -251,6 +254,51 @@ export default function ProfileScreen() {
       setSigningIn(false);
     }
   }, [googleUser, showToast, syncIdentity]);
+
+  const handleSocialSignIn = useCallback(async (
+    provider: GoogleAuthProvider | TwitterAuthProvider | FacebookAuthProvider,
+    providerName: string,
+  ) => {
+    if (Platform.OS !== "web") {
+      showToast(`${providerName} Sign-In is only available on web.`, "info");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const result = await signInWithPopup(firebaseAuth, provider);
+      const fbUser = result.user;
+      const account: GoogleUser = {
+        name: fbUser.displayName ?? fbUser.email ?? "S MOVIE ORIGINAL User",
+        email: fbUser.email ?? fbUser.uid,
+        picture: fbUser.photoURL ?? undefined,
+      };
+      setGoogleUser(account);
+      setIdentity(null);
+      await AsyncStorage.removeItem("smovie_auth_user");
+      await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
+      setShowAuthModal(false);
+      setShowGoogleModal(false);
+      await syncIdentity(account);
+      showToast(`Welcome! Signed in with ${providerName}.`, "ok");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      const code = err?.code ?? "";
+      const message = err?.message ?? String(e);
+      showToast(`Sign-in error: ${code || message || "Unknown error"}`, "err");
+    } finally {
+      setSigningIn(false);
+    }
+  }, [showToast, syncIdentity]);
+
+  const handleTwitterSignIn = useCallback(() => {
+    const provider = new TwitterAuthProvider();
+    return handleSocialSignIn(provider, "Twitter");
+  }, [handleSocialSignIn]);
+
+  const handleFacebookSignIn = useCallback(() => {
+    const provider = new FacebookAuthProvider();
+    return handleSocialSignIn(provider, "Facebook");
+  }, [handleSocialSignIn]);
 
   const handleGoogleSignOut = useCallback(async () => {
     setGoogleUser(null);
@@ -457,6 +505,14 @@ export default function ProfileScreen() {
     } catch {}
   }, []);
 
+  // Auto-check for updates on mount — drives the "New Version" badge on Settings row
+  useEffect(() => {
+    checkForAppUpdate().then((r) => {
+      if (r.isAvailable) setProfileHasNewVersion(true);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const checkForUpdates = useCallback(async () => {
     setUpdateState("checking");
     showToast("Checking for updates…", "info", 8000);
@@ -651,7 +707,7 @@ export default function ProfileScreen() {
           {!googleUser && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Sign In or Create Account"
+              accessibilityLabel="Sign In"
               onPress={() => setShowAuthModal(true)}
               style={({ pressed }) => [
                 styles.profileAuthTrigger,
@@ -659,7 +715,7 @@ export default function ProfileScreen() {
               ]}
               testID="profile-auth-trigger"
             >
-              <Text style={styles.profileAuthTriggerText}>Sign In / Create Account</Text>
+              <Text style={styles.profileAuthTriggerText}>Sign In</Text>
             </Pressable>
           )}
 
@@ -805,7 +861,16 @@ export default function ProfileScreen() {
               icon={<Ionicons name="settings-outline" size={21} color="#fff" />}
               label="Settings"
               sub="Preferences, playback, privacy & more"
-              right={<Feather name="chevron-right" size={18} color="#404040" />}
+              right={
+                profileHasNewVersion ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(14,165,233,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ color: "#0EA5E9", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>New Version</Text>
+                    <Feather name="chevron-right" size={13} color="#0EA5E9" />
+                  </View>
+                ) : (
+                  <Feather name="chevron-right" size={18} color="#404040" />
+                )
+              }
               onPress={() => router.push("/settings")}
             />
           </Section>
@@ -840,12 +905,19 @@ export default function ProfileScreen() {
           setShowAuthModal(false);
           void handleGoogleSignIn();
         }}
+        onTwitterPress={() => {
+          setShowAuthModal(false);
+          void handleTwitterSignIn();
+        }}
+        onFacebookPress={() => {
+          setShowAuthModal(false);
+          void handleFacebookSignIn();
+        }}
         onPhonePress={() => {
           setShowAuthModal(false);
           setShowPhoneAuthModal(true);
         }}
         onSignIn={handleEmailSignIn}
-        onForgotPassword={handleForgotPassword}
         onCreateAccount={handleCreateAccount}
       />
 

@@ -11,9 +11,11 @@ export interface AuthenticationModalProps {
   onClose: () => void;
   onGooglePress?: () => void;
   onPhonePress?: () => void;
+  onTwitterPress?: () => void;
+  onFacebookPress?: () => void;
   onSignIn?: (credentials: { email: string; password: string }) => void | Promise<void>;
-  onForgotPassword?: (email: string) => void | Promise<void>;
   /** Kept in interface for backward compatibility but not exposed in UI */
+  onForgotPassword?: (email: string) => void | Promise<void>;
   onCreateAccount?: (account: {
     name: string;
     email: string;
@@ -27,8 +29,9 @@ export default function AuthenticationModal({
   onClose,
   onGooglePress,
   onPhonePress,
+  onTwitterPress,
+  onFacebookPress,
   onSignIn,
-  onForgotPassword,
 }: AuthenticationModalProps) {
   const colors = useColors();
   const [email, setEmail] = useState("");
@@ -45,10 +48,6 @@ export default function AuthenticationModal({
 
   const handleSubmit = () => {
     onSignIn?.({ email: email.trim(), password });
-  };
-
-  const handleForgotPassword = () => {
-    onForgotPassword?.(email.trim());
   };
 
   return (
@@ -129,6 +128,36 @@ export default function AuthenticationModal({
                 accessibilityRole="button"
                 style={({ pressed }) => [
                   styles.socialButton,
+                  { backgroundColor: "#1DA1F2", borderColor: "#1DA1F2" },
+                  pressed && styles.pressed,
+                ]}
+                onPress={onTwitterPress}
+                testID="auth-twitter-button"
+              >
+                <Text style={[styles.socialButtonText, { color: "#fff", fontSize: 16, fontFamily: "Inter_800ExtraBold" }]}>𝕏</Text>
+                <Text style={[styles.socialButtonText, { color: "#fff" }]}>
+                  Continue with Twitter
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.socialButton,
+                  { backgroundColor: "#1877F2", borderColor: "#1877F2" },
+                  pressed && styles.pressed,
+                ]}
+                onPress={onFacebookPress}
+                testID="auth-facebook-button"
+              >
+                <Text style={[styles.socialButtonText, { color: "#fff", fontSize: 18, fontFamily: "Inter_800ExtraBold" }]}>f</Text>
+                <Text style={[styles.socialButtonText, { color: "#fff" }]}>
+                  Continue with Facebook
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.socialButton,
                   { backgroundColor: colors.secondary, borderColor: colors.border },
                   pressed && styles.pressed,
                 ]}
@@ -196,16 +225,6 @@ export default function AuthenticationModal({
                 </Pressable>
               </View>
             </View>
-
-            {/* Forgot password */}
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleForgotPassword}
-              style={styles.forgotButton}
-              testID="auth-forgot-password"
-            >
-              <Text style={[styles.linkText, { color: colors.primary }]}>Forgot password?</Text>
-            </Pressable>
 
             {/* Sign In button */}
             <Pressable

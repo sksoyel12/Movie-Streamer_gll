@@ -11,6 +11,59 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "S-Movie Download Page"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "S-MOVIE App"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
+waitForPort = 8080
+
+[[workflows.workflow]]
+name = "S-Movie Download Page"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=21381 BASE_PATH=/smovie-download/ pnpm --filter @workspace/smovie-download run dev"
+waitForPort = 21381
+
+[[workflows.workflow]]
+name = "S-MOVIE App"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=23135 pnpm --filter @workspace/s-movie run dev"
+waitForPort = 23135
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true

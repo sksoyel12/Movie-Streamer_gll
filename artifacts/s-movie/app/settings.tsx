@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -27,7 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CURRENT_VERSION } from "@/data/releaseNotes";
 import { firebaseAuth } from "@/lib/firebase";
 import { haptic } from "@/lib/haptics";
-import { checkForAppUpdate } from "@/lib/appUpdate";
+import { checkForAppUpdate, type VersionInfo } from "@/lib/appUpdate";
 import { GOOGLE_USER_KEY } from "@/app/(tabs)/profile";
 
 // ─── Local storage keys ─────────────────────────────────────────────────────
@@ -63,6 +64,23 @@ export default function SettingsScreen() {
 
   const [checkingUpdate, setCheckingUpdate]   = useState(false);
   const [clearingCache, setClearingCache]     = useState(false);
+  const [hasNewVersion, setHasNewVersion]     = useState(false);
+  const [newVersionInfo, setNewVersionInfo]   = useState<VersionInfo | null>(null);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+
+  // ── Auto-check for updates on mount ────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await checkForAppUpdate();
+        if (result.isAvailable && result.info) {
+          setHasNewVersion(true);
+          setNewVersionInfo(result.info);
+          setShowUpdatePopup(true);
+        }
+      } catch {}
+    })();
+  }, []);
 
   // ── Load persisted preferences ──────────────────────────────────────────
   useEffect(() => {
@@ -164,17 +182,13 @@ export default function SettingsScreen() {
     try {
       const result = await checkForAppUpdate();
       if (result.isAvailable && result.info) {
-        Alert.alert(
-          "Update Available",
-          `Version ${result.info.version} is ready to download.`,
-          [
-            { text: "Not Now", style: "cancel" },
-            { text: "Go to Profile", onPress: () => router.push("/(tabs)/profile") },
-          ],
-        );
+        setHasNewVersion(true);
+        setNewVersionInfo(result.info);
+        setShowUpdatePopup(true);
       } else if (result.error) {
         Alert.alert("Couldn't Check for Updates", result.error);
       } else {
+        setHasNewVersion(false);
         Alert.alert("You're up to date", `S MOVIE ORIGINAL v${CURRENT_VERSION} is the latest version.`);
       }
     } finally {
@@ -360,6 +374,16 @@ export default function SettingsScreen() {
             sub={`Current version: v${CURRENT_VERSION}`}
             right={checkingUpdate
               ? <ActivityIndicator size="small" color="#0EA5E9" />
+              : hasNewVersion
+              ? (
+                <Pressable
+                  onPress={() => setShowUpdatePopup(true)}
+                  style={styles.newVersionBadge}
+                >
+                  <Text style={styles.newVersionText}>New Version</Text>
+                  <Feather name="chevron-right" size={14} color="#0EA5E9" />
+                </Pressable>
+              )
               : <Feather name="chevron-right" size={18} color="#404040" />}
             onPress={handleCheckUpdate}
             disabled={checkingUpdate}
@@ -411,6 +435,67 @@ export default function SettingsScreen() {
                 {watchOption === opt && <Ionicons name="checkmark" size={20} color="#E50914" />}
               </Pressable>
             ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── New Version / Update Available popup (bottom sheet) ──────── */}
+      <Modal visible={showUpdatePopup} transparent animationType="slide" onRequestClose={() => setShowUpdatePopup(false)}>
+        <Pressable style={styles.updateBackdrop} onPress={() => setShowUpdatePopup(false)}>
+          <Pressable style={styles.updateSheet} onPress={(e) => e.stopPropagation()}>
+            {/* Drag handle */}
+            <View style={styles.updateHandle} />
+
+            {/* Title */}
+            <Text style={styles.updateSheetTitle}>New Version</Text>
+
+            {/* App info row */}
+            <View style={styles.updateAppRow}>
+              <Image
+                source={require("../assets/images/s-logo.png")}
+                style={styles.updateAppIcon}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.updateAppName}>S MOVIE ORIGINAL</Text>
+                {newVersionInfo && (
+                  <Text style={styles.updateAppVersion}>Version: {newVersionInfo.version}</Text>
+                )}
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.updateDivider} />
+
+            {/* Details */}
+            <Text style={styles.updateDetailsLabel}>Details</Text>
+            <Text style={styles.updateDetailsText}>
+              {newVersionInfo?.releaseNotes
+                ? newVersionInfo.releaseNotes
+                : "A new version of S MOVIE ORIGINAL is available. Update now for the latest features and improvements."}
+            </Text>
+
+            {/* Divider */}
+            <View style={styles.updateDivider} />
+
+            {/* Buttons row */}
+            <View style={styles.updateBtnRow}>
+              <Pressable
+                style={({ pressed }) => [styles.updateLaterBtn, pressed && { opacity: 0.6 }]}
+                onPress={() => setShowUpdatePopup(false)}
+              >
+                <Text style={styles.updateLaterText}>Later</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.updateNowBtn, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  setShowUpdatePopup(false);
+                  router.push("/(tabs)/profile");
+                }}
+              >
+                <Text style={styles.updateNowText}>Update</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -563,4 +648,116 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalOptionText: { color: "#e5e5e5", fontSize: 14.5, fontFamily: "Inter_500Medium" },
+
+  // ── New Version badge ──────────────────────────────────────────────────
+  newVersionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(14,165,233,0.12)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  newVersionText: {
+    color: "#0EA5E9",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  // ── Update popup (bottom sheet) ────────────────────────────────────────
+  updateBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  updateSheet: {
+    backgroundColor: "#1a1a1a",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 22,
+    paddingBottom: 36,
+    paddingTop: 12,
+  },
+  updateHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#444",
+    alignSelf: "center",
+    marginBottom: 18,
+  },
+  updateSheetTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 18,
+  },
+  updateAppRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 20,
+  },
+  updateAppIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: "#111",
+  },
+  updateAppName: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 2,
+  },
+  updateAppVersion: {
+    color: "#888",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  updateDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginBottom: 16,
+  },
+  updateDetailsLabel: {
+    color: "#aaa",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+  updateDetailsText: {
+    color: "#ccc",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  updateBtnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 32,
+    paddingTop: 4,
+  },
+  updateLaterBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  updateLaterText: {
+    color: "#888",
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+  },
+  updateNowBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  updateNowText: {
+    color: "#0EA5E9",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
 });
