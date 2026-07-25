@@ -6,10 +6,10 @@ import { logger } from "../lib/logger";
 // ---------------------------------------------------------------------------
 
 function createTransporter() {
-  const user = process.env["EMAIL_USER"];
-  const pass = process.env["EMAIL_PASS"];
+  const user = process.env["EMAIL_USER"] ?? process.env["Email_user"] ?? process.env["email_user"];
+  const pass = process.env["EMAIL_PASS"] ?? process.env["Email_pass"] ?? process.env["email_pass"];
   if (!user || !pass)
-    throw new Error("EMAIL_USER and EMAIL_PASS must be set to send emails.");
+    throw new Error("EMAIL_USER and Email_pass must be set to send emails.");
   return nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
 }
 
