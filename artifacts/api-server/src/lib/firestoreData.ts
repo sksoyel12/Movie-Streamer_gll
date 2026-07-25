@@ -38,6 +38,7 @@ export interface TmdbMovie {
 
 function tmdbKey(): string | null {
   return (
+    process.env["TmDB_api_kay_"] ??
     process.env["TMDB_API_KEY_V3"] ??
     process.env["TMDB_API_KEY"] ??
     process.env["EXPO_PUBLIC_TMDB_API_KEY"] ??
