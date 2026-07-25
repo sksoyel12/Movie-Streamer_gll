@@ -1,5 +1,10 @@
 import { Router, type Request } from "express";
-import { sendWelcomeEmail, sendOtpEmail, sendLoginNotificationEmail } from "../utils/emailSender";
+import {
+  sendWelcomeEmail,
+  sendOtpEmail,
+  sendLoginNotificationEmail,
+  sendGoodbyeEmail,
+} from "../utils/emailSender";
 import { logger } from "../lib/logger";
 
 const authRouter = Router();
@@ -12,94 +17,70 @@ function validEmail(value: unknown): value is string {
   return typeof value === "string" && value.includes("@") && value.length > 3;
 }
 
-/** Best-effort IP extraction (handles Replit proxy headers). */
 function extractIp(req: Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") return forwarded.split(",")[0]?.trim() ?? "Unknown";
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string") return fwd.split(",")[0]?.trim() ?? "Unknown";
   return req.socket?.remoteAddress ?? "Unknown";
 }
 
-/** Format a Date into a human-readable string like "25 Jul 2026, 07:08 UTC". */
 function formatTime(date: Date): string {
   return date.toUTCString().replace("GMT", "UTC");
 }
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/welcome-email
-// Called by the mobile app immediately after a new Firebase account is created.
 // ---------------------------------------------------------------------------
 
 authRouter.post("/auth/welcome-email", async (req, res) => {
   const { email, displayName } = req.body as { email?: unknown; displayName?: unknown };
-
   if (!validEmail(email)) {
-    res.status(400).json({ success: false, message: "A valid email address is required." });
+    res.status(400).json({ success: false, message: "Valid email required." });
     return;
   }
-
   logger.info({ email }, "Welcome email requested");
-
-  // Always best-effort — never blocks registration
   await sendWelcomeEmail(email, typeof displayName === "string" ? displayName : undefined);
-
   res.status(200).json({ success: true, message: "Welcome email dispatched." });
 });
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/send-otp
-// Accepts { email, otp, expiryMinutes? } — caller generates and owns the OTP.
-// Server only sends the styled email.
 // ---------------------------------------------------------------------------
 
 authRouter.post("/auth/send-otp", async (req, res) => {
-  const { email, otp, expiryMinutes } = req.body as {
-    email?: unknown;
-    otp?: unknown;
-    expiryMinutes?: unknown;
-  };
-
+  const { email, otp, expiryMinutes } = req.body as { email?: unknown; otp?: unknown; expiryMinutes?: unknown };
   if (!validEmail(email)) {
-    res.status(400).json({ success: false, message: "A valid email address is required." });
+    res.status(400).json({ success: false, message: "Valid email required." });
     return;
   }
-
-  // OTP must be a non-empty string of digits
   if (typeof otp !== "string" || !/^\d{4,8}$/.test(otp)) {
-    res.status(400).json({ success: false, message: "otp must be a 4–8 digit numeric string." });
+    res.status(400).json({ success: false, message: "otp must be a 4–8 digit string." });
     return;
   }
-
   const expiry = typeof expiryMinutes === "number" && expiryMinutes > 0 ? expiryMinutes : 5;
-
   logger.info({ email }, "OTP email requested");
-
   await sendOtpEmail(email, otp, expiry);
-
   res.status(200).json({ success: true, message: "OTP email dispatched." });
 });
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/login-notification
-// Called by the mobile app on every successful login (non-first-time users).
+// Accepts: { email, deviceName?, platform?, posterUrl?, movieTitle? }
 // ---------------------------------------------------------------------------
 
 authRouter.post("/auth/login-notification", async (req, res) => {
-  const { email, deviceName, platform } = req.body as {
-    email?: unknown;
-    deviceName?: unknown;
-    platform?: unknown;
+  const { email, deviceName, platform, posterUrl, movieTitle } = req.body as {
+    email?: unknown; deviceName?: unknown; platform?: unknown;
+    posterUrl?: unknown; movieTitle?: unknown;
   };
-
   if (!validEmail(email)) {
-    res.status(400).json({ success: false, message: "A valid email address is required." });
+    res.status(400).json({ success: false, message: "Valid email required." });
     return;
   }
 
-  const ip          = extractIp(req);
-  const loginTime   = formatTime(new Date());
-  const device      = [
+  const ip       = extractIp(req);
+  const device   = [
     typeof deviceName === "string" && deviceName ? deviceName : null,
-    typeof platform  === "string" && platform   ? platform  : null,
+    typeof platform   === "string" && platform   ? platform   : null,
   ].filter(Boolean).join(" · ") || "Unknown Device";
 
   logger.info({ email, device, ip }, "Login notification requested");
@@ -107,12 +88,30 @@ authRouter.post("/auth/login-notification", async (req, res) => {
   await sendLoginNotificationEmail({
     recipientEmail:  email,
     deviceName:      device,
-    loginTime,
+    loginTime:       formatTime(new Date()),
     location:        ip !== "Unknown" ? `IP: ${ip}` : "Unknown Location",
-    secureAccountUrl: process.env["APP_URL"] ?? undefined,
+    posterUrl:       typeof posterUrl   === "string" ? posterUrl   : null,
+    movieTitle:      typeof movieTitle  === "string" ? movieTitle  : null,
+    secureAccountUrl: process.env["APP_URL"],
   });
 
   res.status(200).json({ success: true, message: "Login notification dispatched." });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/logout-notification
+// Accepts: { email, displayName? }
+// ---------------------------------------------------------------------------
+
+authRouter.post("/auth/logout-notification", async (req, res) => {
+  const { email, displayName } = req.body as { email?: unknown; displayName?: unknown };
+  if (!validEmail(email)) {
+    res.status(400).json({ success: false, message: "Valid email required." });
+    return;
+  }
+  logger.info({ email }, "Logout / goodbye email requested");
+  await sendGoodbyeEmail(email, typeof displayName === "string" ? displayName : null);
+  res.status(200).json({ success: true, message: "Goodbye email dispatched." });
 });
 
 export default authRouter;

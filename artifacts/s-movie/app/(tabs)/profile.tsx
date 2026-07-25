@@ -70,6 +70,7 @@ import {
   type VersionInfo,
 } from "@/lib/appUpdate";
 import { registerForPushNotificationsAsync } from "@/lib/notifications";
+import { triggerLogoutEmail, triggerLoginNotification } from "@/lib/emailTriggers";
 
 const PUSH_TOKEN_KEY = "smovie_push_token";
 const NOTIF_ENABLED_KEY = "smovie_notifications_enabled";
@@ -255,6 +256,11 @@ export default function ProfileScreen() {
     setGoogleUser(null);
     setIdentity(null);
     await AsyncStorage.removeItem(GOOGLE_USER_KEY);
+    // Fire goodbye email before signing out (fire-and-forget, never blocks)
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser?.email) {
+      triggerLogoutEmail(currentUser.email, currentUser.displayName);
+    }
     await firebaseSignOut(firebaseAuth).catch(() => {});
     setShowGoogleModal(false);
     showToast("Signed out successfully.", "info");
@@ -287,7 +293,11 @@ export default function ProfileScreen() {
       setGoogleUser(account);
       await AsyncStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(account));
       setShowAuthModal(false);
-      showToast("Welcome back. You’re signed in.", "ok");
+      showToast("Welcome back. You're signed in.", "ok");
+      // Fire login notification email (Netflix-style security alert)
+      if (user.email) {
+        triggerLoginNotification(user.email, user.displayName);
+      }
     } catch (errorValue) {
       const code = (errorValue as { code?: string })?.code ?? "";
       const message =

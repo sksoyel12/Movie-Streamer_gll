@@ -6,8 +6,6 @@ import { BlurView } from "expo-blur";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useColors } from "@/hooks/useColors";
 
-type AuthMode = "login" | "signup";
-
 export interface AuthenticationModalProps {
   visible: boolean;
   onClose: () => void;
@@ -15,6 +13,7 @@ export interface AuthenticationModalProps {
   onPhonePress?: () => void;
   onSignIn?: (credentials: { email: string; password: string }) => void | Promise<void>;
   onForgotPassword?: (email: string) => void | Promise<void>;
+  /** Kept in interface for backward compatibility but not exposed in UI */
   onCreateAccount?: (account: {
     name: string;
     email: string;
@@ -30,43 +29,22 @@ export default function AuthenticationModal({
   onPhonePress,
   onSignIn,
   onForgotPassword,
-  onCreateAccount,
 }: AuthenticationModalProps) {
   const colors = useColors();
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!visible) {
-      setMode("login");
       setShowPassword(false);
-      setName("");
       setEmail("");
       setPassword("");
-      setConfirmPassword("");
     }
   }, [visible]);
 
-  const switchMode = () => {
-    setMode((current) => (current === "login" ? "signup" : "login"));
-    setShowPassword(false);
-  };
-
   const handleSubmit = () => {
-    if (mode === "login") {
-      onSignIn?.({ email: email.trim(), password });
-      return;
-    }
-    onCreateAccount?.({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-      confirmPassword,
-    });
+    onSignIn?.({ email: email.trim(), password });
   };
 
   const handleForgotPassword = () => {
@@ -81,9 +59,9 @@ export default function AuthenticationModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={[styles.backdrop, { backgroundColor: "rgba(0,0,0,0.78)" }]}>
+      <View style={[styles.backdrop, { backgroundColor: "rgba(0,0,0,0.82)" }]}>
         <BlurView
-          intensity={Platform.OS === "ios" ? 26 : 18}
+          intensity={Platform.OS === "ios" ? 28 : 20}
           tint="dark"
           style={StyleSheet.absoluteFill}
         />
@@ -102,17 +80,12 @@ export default function AuthenticationModal({
           showsVerticalScrollIndicator={false}
         >
           <Pressable
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-              },
-            ]}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={(event) => event.stopPropagation()}
             accessibilityViewIsModal
             testID="authentication-modal"
           >
+            {/* Header */}
             <View style={styles.cardHeader}>
               <View style={[styles.brandMark, { backgroundColor: `${colors.primary}1F` }]}>
                 <Ionicons name="person-outline" size={22} color={colors.primary} />
@@ -129,69 +102,53 @@ export default function AuthenticationModal({
               </Pressable>
             </View>
 
-            <Text style={[styles.title, { color: colors.foreground }]}>
-              {mode === "login" ? "Welcome back" : "Create your account"}
-            </Text>
+            {/* Title */}
+            <Text style={[styles.title, { color: colors.foreground }]}>Welcome back</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              {mode === "login"
-                ? "Sign in to continue watching on S MOVIE ORIGINAL"
-                : "Join S MOVIE ORIGINAL and keep your watchlist in sync"}
+              Sign in to continue watching on S MOVIE ORIGINAL
             </Text>
 
-            {mode === "login" && (
-              <>
-                <View style={styles.quickActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={({ pressed }) => [
-                      styles.socialButton,
-                      { backgroundColor: colors.secondary, borderColor: colors.border },
-                      pressed && styles.pressed,
-                    ]}
-                    onPress={onGooglePress}
-                    testID="auth-google-button"
-                  >
-                    <Text style={[styles.googleLogo, { color: colors.foreground }]}>G</Text>
-                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                      Continue with Google
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={({ pressed }) => [
-                      styles.socialButton,
-                      { backgroundColor: colors.secondary, borderColor: colors.border },
-                      pressed && styles.pressed,
-                    ]}
-                    onPress={onPhonePress}
-                    testID="auth-phone-button"
-                  >
-                    <Ionicons name="phone-portrait-outline" size={18} color={colors.foreground} />
-                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                      Continue with Phone
-                    </Text>
-                  </Pressable>
-                </View>
+            {/* Social sign-in */}
+            <View style={styles.quickActions}>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.socialButton,
+                  { backgroundColor: colors.secondary, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
+                onPress={onGooglePress}
+                testID="auth-google-button"
+              >
+                <Text style={[styles.googleLogo, { color: colors.foreground }]}>G</Text>
+                <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                  Continue with Google
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.socialButton,
+                  { backgroundColor: colors.secondary, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
+                onPress={onPhonePress}
+                testID="auth-phone-button"
+              >
+                <Ionicons name="phone-portrait-outline" size={18} color={colors.foreground} />
+                <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                  Continue with Phone
+                </Text>
+              </Pressable>
+            </View>
 
-                <View style={styles.dividerRow}>
-                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                  <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
-                  <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                </View>
-              </>
-            )}
+            <View style={styles.dividerRow}>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            </View>
 
-            {mode === "signup" && (
-              <Field
-                label="Name"
-                placeholder="Your name"
-                value={name}
-                onChangeText={setName}
-                colors={colors}
-                testID="auth-name-input"
-              />
-            )}
-
+            {/* Email field */}
             <Field
               label="Email"
               placeholder="you@example.com"
@@ -203,9 +160,15 @@ export default function AuthenticationModal({
               testID="auth-email-input"
             />
 
+            {/* Password field */}
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>Password</Text>
-              <View style={[styles.passwordWrap, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.passwordWrap,
+                  { backgroundColor: colors.secondary, borderColor: colors.border },
+                ]}
+              >
                 <TextInput
                   style={[styles.passwordInput, { color: colors.foreground }]}
                   placeholder="Enter your password"
@@ -220,7 +183,7 @@ export default function AuthenticationModal({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  onPress={() => setShowPassword((current) => !current)}
+                  onPress={() => setShowPassword((v) => !v)}
                   hitSlop={10}
                   style={styles.eyeButton}
                   testID="auth-password-toggle"
@@ -234,29 +197,17 @@ export default function AuthenticationModal({
               </View>
             </View>
 
-            {mode === "signup" && (
-              <Field
-                label="Confirm password"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showPassword}
-                colors={colors}
-                testID="auth-confirm-password-input"
-              />
-            )}
+            {/* Forgot password */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleForgotPassword}
+              style={styles.forgotButton}
+              testID="auth-forgot-password"
+            >
+              <Text style={[styles.linkText, { color: colors.primary }]}>Forgot password?</Text>
+            </Pressable>
 
-            {mode === "login" && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleForgotPassword}
-                style={styles.forgotButton}
-                testID="auth-forgot-password"
-              >
-                <Text style={[styles.linkText, { color: colors.primary }]}>Forgot password?</Text>
-              </Pressable>
-            )}
-
+            {/* Sign In button */}
             <Pressable
               accessibilityRole="button"
               style={({ pressed }) => [
@@ -265,27 +216,11 @@ export default function AuthenticationModal({
                 pressed && styles.pressed,
               ]}
               onPress={handleSubmit}
-              testID={mode === "login" ? "auth-sign-in-button" : "auth-create-account-button"}
+              testID="auth-sign-in-button"
             >
-              <Text style={[styles.submitText, { color: colors.primaryForeground }]}>
-                {mode === "login" ? "Sign In" : "Create account"}
-              </Text>
+              <Text style={[styles.submitText, { color: colors.primaryForeground }]}>Sign In</Text>
             </Pressable>
 
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                {mode === "login" ? "New to S MOVIE ORIGINAL?" : "Already have an account?"}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={switchMode}
-                testID="auth-toggle-mode"
-              >
-                <Text style={[styles.linkText, { color: colors.primary }]}>
-                  {mode === "login" ? "Create new account" : "Sign in"}
-                </Text>
-              </Pressable>
-            </View>
           </Pressable>
         </KeyboardAwareScrollViewCompat>
       </View>
@@ -378,9 +313,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  closeButton: {
-    padding: 4,
-  },
+  closeButton: { padding: 4 },
   title: {
     fontSize: 23,
     fontFamily: "Inter_700Bold",
@@ -393,9 +326,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 20,
   },
-  quickActions: {
-    gap: 10,
-  },
+  quickActions: { gap: 10 },
   socialButton: {
     minHeight: 50,
     borderRadius: 12,
@@ -427,9 +358,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     marginHorizontal: 12,
   },
-  field: {
-    marginBottom: 14,
-  },
+  field: { marginBottom: 14 },
   label: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
@@ -485,18 +414,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_700Bold",
   },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    marginTop: 20,
-  },
-  footerText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  pressed: {
-    opacity: 0.78,
-  },
+  pressed: { opacity: 0.78 },
 });

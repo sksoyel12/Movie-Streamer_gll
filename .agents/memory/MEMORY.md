@@ -3,3 +3,4 @@
 - [Auth and watch progress](auth-watch-progress.md) — Firebase Auth is the session source; signed-in playback syncs to Firestore with local guest fallback.
 - [TMDB proxy configuration](tmdb-proxy.md) — server-side TMDB calls require the v3 key secret and fail explicitly when it is unavailable.
 - [Playback and downloads](playback-downloads.md) — embed pages are streaming-only; native playback and offline downloads require verified direct media URLs.
+- [Email notification system](email-notifications.md) — 5 nodemailer templates wired to auth events; cron job needs Firebase Admin secrets to send daily emails.

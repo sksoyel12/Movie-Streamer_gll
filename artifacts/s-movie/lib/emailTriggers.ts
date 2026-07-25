@@ -1,7 +1,7 @@
 /**
  * Email trigger helpers — fire-and-forget calls to the API server.
  *
- * All functions are void and swallow every error so the auth flow is
+ * Every function is void and swallows all errors so the auth flow is
  * never interrupted by a transient email delivery failure.
  */
 
@@ -9,7 +9,7 @@ import { Platform } from "react-native";
 import { API_BASE } from "@/lib/apiBase";
 
 // ---------------------------------------------------------------------------
-// Internal helper
+// Internal fire-and-forget POST
 // ---------------------------------------------------------------------------
 
 function post(path: string, body: Record<string, unknown>): void {
@@ -30,9 +30,10 @@ function post(path: string, body: Record<string, unknown>): void {
 }
 
 // ---------------------------------------------------------------------------
-// Returns true on the very first sign-in (Firebase creationTime === lastSignInTime)
+// First-login detection
 // ---------------------------------------------------------------------------
 
+/** Returns true only on the very first Firebase sign-in ever for this account. */
 export function isFirstTimeUser(metadata: {
   creationTime?: string;
   lastSignInTime?: string;
@@ -46,8 +47,8 @@ export function isFirstTimeUser(metadata: {
 // ---------------------------------------------------------------------------
 
 /**
- * Sends the Netflix-inspired welcome email.
- * Call once immediately after the first-ever Firebase sign-in.
+ * → Welcome email (Netflix-style hero + "Start Watching" CTA).
+ * Call once after the very first Firebase sign-in.
  */
 export function triggerWelcomeEmail(email: string, displayName?: string | null): void {
   if (!email) return;
@@ -58,32 +59,45 @@ export function triggerWelcomeEmail(email: string, displayName?: string | null):
 }
 
 /**
- * Sends a login-notification / security-alert email.
- * Call on every subsequent (non-first-time) sign-in.
+ * → Login notification with optional "Continue Watching" poster.
+ * Call on every subsequent (returning-user) sign-in.
+ *
+ * @param posterUrl  Proxied poster image URL of the last-watched movie (optional)
+ * @param movieTitle Title of the last-watched movie (optional)
  */
 export function triggerLoginNotification(
   email: string,
-  deviceName?: string | null,
+  displayName?: string | null,
+  posterUrl?: string | null,
+  movieTitle?: string | null,
 ): void {
   if (!email) return;
   post("/auth/login-notification", {
     email,
     platform:   Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "Android" : "Web",
-    deviceName: deviceName ?? null,
+    deviceName: displayName ?? null,
+    ...(posterUrl   ? { posterUrl }   : {}),
+    ...(movieTitle  ? { movieTitle }  : {}),
   });
 }
 
 /**
- * Sends an OTP / verification code email.
- * The caller generates `otp` (4–8 numeric digits) and manages verification.
- * @param otp           4–8 digit numeric string (e.g. "847291")
- * @param expiryMinutes How long the code is valid (default 5)
+ * → Goodbye / logout email.
+ * Call right before invoking Firebase signOut().
  */
-export function triggerOtpEmail(
-  email: string,
-  otp: string,
-  expiryMinutes = 5,
-): void {
+export function triggerLogoutEmail(email: string, displayName?: string | null): void {
+  if (!email) return;
+  post("/auth/logout-notification", {
+    email,
+    ...(displayName ? { displayName } : {}),
+  });
+}
+
+/**
+ * → OTP / verification code email.
+ * The caller generates `otp` (4–8 numeric digits) and manages verification.
+ */
+export function triggerOtpEmail(email: string, otp: string, expiryMinutes = 5): void {
   if (!email || !otp) return;
   post("/auth/send-otp", { email, otp, expiryMinutes });
 }
